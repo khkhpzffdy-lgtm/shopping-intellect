@@ -57,18 +57,19 @@ frames**. Top-right toggles **Тъмна / Светла** (dark / light). Open *
 | `ios-frame.jsx` | iOS device bezel / status bar (starter scaffold). |
 | `tweaks-panel.jsx` | The live Tweaks panel + form controls (starter scaffold). |
 
-## Two deliberate deviations from the reference images
+## Canon adherence
 
-The user's reference screenshots showed a product-detail layout with **Приоритет /
-single Магазин / Напомни ми** and a bottom-nav **История** tab. Those are **not in the
-MVP** (the docs are demand-first: broad candidates across all stores, promo markers,
-opt-in brand anchor; no priority/reminders; no standalone purchase-history view). The
-prototype keeps the reference's *look* but fills it with **doc-correct content**:
+The prototype stays strictly inside the rulebook in `10-ux-rules.md` and the MVP scope
+in `00-overview.md`:
 
-- **Product Detail** = broad candidates + brand anchor (not priority/store/reminders).
-- **Bottom nav** = Списъци / Семейство / Профил (per `10-ux-rules.md`), not История.
+- **Product Detail** = broad candidates across all stores + opt-in brand anchor. No
+  single-/pinned-store, no priority, no reminders — those concepts don't exist in the
+  canon, and a pinned store would contradict broad-by-default cross-store comparison.
+- **Bottom nav** = Списъци / Семейство / Профил only. No История tab: the purchase log
+  surfaces **only** as recently / frequently bought in Add/Search (`10 §6.4`), never as a
+  standalone history screen.
+- Broad-by-default, opt-in anchor, owner metadata, offline-first, no prices at rest or in
+  store, no conflict UI.
 
 Theme switching lives in the board header here; in the real app it belongs in **Профил**
-as a Светла / Тъмна / Системна setting. Everything else stays strictly inside the
-rulebook in `10-ux-rules.md` (broad-by-default, opt-in anchor, owner metadata,
-offline-first, no prices at rest or in store, no conflict UI).
+as a Светла / Тъмна / Системна setting.

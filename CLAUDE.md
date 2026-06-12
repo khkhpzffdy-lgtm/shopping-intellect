@@ -46,9 +46,10 @@ dialog). Two people, side project, **€0 additional infra in Stage 1** (D §5).
    `list_items` and `user_products`** — additionally carry a `client_uuid` (UUIDv4) for
    idempotent sync. (01 §8, D §9.)
 1. **Naming is fixed:** PHP namespace `ShoppingIntellect\` · REST namespace `si/v1`
-   (mounted at `/wp-json/si/v1/`) · tables `<TABLE_PREFIX>_*`. **The final table prefix
-   is still TBD** (D §14) — use the `<TABLE_PREFIX>` placeholder everywhere until it is
-   recorded in `decisions.md` §6, then find-and-replace.
+   (mounted at `/wp-json/si/v1/`) · tables **`oCk_si_*`** — the table prefix is
+   **`$wpdb->prefix` + `si_`**, resolving to `oCk_si_` on the current install
+   (`$table_prefix = 'oCk_'`); build table names as `$wpdb->prefix . 'si_' . '<name>'`
+   so they follow the install. (D §6/§14.)
 1. **Security defaults:** prepared statements only; exact-origin CORS; access JWT held
    **in memory only** (never `localStorage`); refresh token in an `httpOnly Secure`
    cookie. App users hold a zero-capability `si_user` role, blocked from `wp-admin`.
@@ -101,6 +102,10 @@ points at directly — **stop.** That is the old model; this revision replaced i
 |PWA, offline/sync, two-mode list                                             |`07-frontend.md`              |
 |Scaling stages, extraction triggers                                          |`08-scaling-migration.md`     |
 |Risks, costs, hardening checklist                                            |`09-risks-costs.md`           |
+|Screen-state & component-behaviour rules                                     |`10-ux-rules.md`              |
+|End-to-end MVP user flows + screen inventory                                 |`11-user-flows.md`            |
+|**How the build is run** — actors, Slice, loop, escalation, handoff templates|`12-execution-model.md`       |
+|**The ordered MVP build line** — every Slice, empty repo → MVP               |`13-implementation-line.md`   |
 
 Every doc carries a **`Load when` / `Depends on` / `Standalone for`** metadata header.
 Read those headers to decide what to load for the task in front of you, rather than
@@ -111,8 +116,14 @@ loading the whole set. `decisions.md` is always loaded; the rest are on demand.
 ## 5. Working process & discipline
 
 - **`decisions.md` is the single source of truth.** When a decision changes, update
-  `decisions.md` **first**, then propagate to the affected `00`–`09` documents — never
+  `decisions.md` **first**, then propagate to the affected `00`–`13` documents — never
   the reverse.
+- **The build runs on the execution model (D §15 / `12` / `13`).** Three actors — Owner
+  (judges product *behaviour*, never code), Claude (scarce, text-only: architecture +
+  Slice design + builder prompts, **does not touch the codebase in normal flow**), Codex
+  (owns implementation, tests, debugging). Work flows through combined **Slices** (`12 §2`),
+  closes on a **two-gate done** (Codex tests pass + Owner confirms behaviour, `12 §3`), and
+  fails forward **Codex-first** (`12 §5`). `13` is the ordered Slice line to build the MVP.
 - **Session-per-settings.** Claude effort + thinking mode cannot change mid-chat. Group
   work by settings group (D §13 records the recommended setting per document) and give
   each group its own session with a pre-crafted prompt.
@@ -128,9 +139,11 @@ loading the whole set. `decisions.md` is always loaded; the rest are on demand.
 
 ## 6. Current state & open questions
 
-The full document set — `00`–`09` plus `decisions.md` — is **complete** and reflects the
-**demand-first** revision. **Code does not exist yet; this is still the architecture
-phase.** The next move is implementation, not more architecture documents.
+The full document set — `00`–`13` plus `decisions.md` — is **complete** and reflects the
+**demand-first** revision; the **execution model is now closed** (D §15, `12`, `13`).
+**Code does not exist yet, but the architecture phase is done.** The next move is **running
+Slices** off `13-implementation-line.md` (starting at M0 §0.1) through the `12` build loop —
+**not** more architecture documents.
 
 **`decisions.md` §14 is the living list of open questions — treat it as authoritative,
 don’t duplicate it here.** As of this writing it still holds, among others: the **final

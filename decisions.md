@@ -172,7 +172,7 @@ Categorization is **lenient on purpose.** A debatable offer landing in a roughly
 ## 6. Backend Architecture
 
 - **WordPress as headless backend** — custom plugin, PSR-4 autoloader, **no Composer**.
-- Custom DB tables (prefix TBD — use a project-specific prefix, *not* the CityPlay `wptl_`; documents use the `<TABLE_PREFIX>` placeholder until recorded).
+- Custom DB tables use the prefix **`$wpdb->prefix` + `si_`** — i.e. WordPress's own install prefix followed by our `si_` namespace. On the current install (`$table_prefix = 'oCk_'`) this **resolves to `oCk_si_`** (e.g. `oCk_si_user_products`). Tables are built from `$wpdb->prefix . 'si_' . '<name>'` so they follow the install if WP's prefix ever changes; documentation shows the resolved literal `oCk_si_`. **(Resolved — closes the §14 "final WP table prefix" open item; replaces the former `<TABLE_PREFIX>` placeholder.)** The dedicated `si_` namespace keeps our tables visually distinct from WP core (`oCk_posts`, …) and from other plugins, and *not* the CityPlay `wptl_`.
 - REST API under `/wp-json/si/v1/...`.
 - **Naming (resolved in `01` §14):** project **Shopping Intellect** · plugin dir `shopping-intellect/` · PHP namespace `ShoppingIntellect\\` · REST namespace `si/v1`.
 - WP Admin reused for: crawler dashboard, catalog management (incl. bucket merge/split, §4), manual price override, data-quality monitoring.
@@ -355,6 +355,9 @@ Recommended Claude settings per document (model: **Opus 4.8** throughout — sam
 |08|`08-scaling-migration.md`|Extra  |ON      |✅ Done                    |
 |09|`09-risks-costs.md`      |Extra  |ON      |✅ Done                    |
 |10|`10-ux-rules.md`         |High   |OFF     |◑ §§1–7 (8–9 next session)|
+|11|`11-user-flows.md`       |High   |OFF     |✅ Done                    |
+|12|`12-execution-model.md`  |High   |OFF     |✅ Done                    |
+|13|`13-implementation-line.md`|Extra|ON     |✅ Done                    |
 |— |`CLAUDE.md`              |High   |OFF     |✅ Done                    |
 
 
@@ -368,7 +371,7 @@ Recommended Claude settings per document (model: **Opus 4.8** throughout — sam
 
 ### Still open
 
-- [ ] **Final WP table prefix** (project-specific, not `wptl_`) — docs use `<TABLE_PREFIX>` until recorded.
+- [x] **Final WP table prefix** → **`$wpdb->prefix` + `si_`**, resolving to **`oCk_si_`** on the current install (`$table_prefix = 'oCk_'`). Tables are derived as `$wpdb->prefix . 'si_' . '<name>'`, so they follow the install. The former `<TABLE_PREFIX>` placeholder is retired across the doc set in favour of the resolved literal `oCk_si_`. (§6)
 - [ ] **SuperHosting `memory_limit` / `max_execution_time` + exact MySQL version** — host facts to confirm before the crawler build. The MySQL version also decides `JSON` vs `TEXT` for `crawl_runs.resume_state` and the `VARCHAR(190)` index-prefix habit (`04` §2.2/§4.6). CLI via cron should bypass web limits; chunked + resumable runs mitigate if it doesn't.
 - [ ] **Analytics:** self-hosted Plausible vs none in MVP.
 - [ ] **Barcode scanner: MVP or Stage 2?** `07` §11 recommends **Stage 2, via the Capacitor camera path** (web `BarcodeDetector` support is too uneven for an MVP dependency; the crawl-side `barcodes` table for Phase-2 categorization is independent of a client scanner). Recorded as the leaning — **confirm**.
@@ -389,8 +392,8 @@ Decided during sessions `04`–`08` (the `04` §8 set at the owner's direction; 
 - [x] **"Frequently bought" = ≥ 3 buys in a rolling 8-week window** — a tunable default held as operator WP options, re-tunable with **no migration**. (`04` §7.5)
 - [x] **`purchase_log` snapshot columns defined now, populated lazily** — `store_product_id`, `unit_price_cents`, `currency` added nullable at creation (to avoid a later `ALTER` on an append-only table); MVP may leave them `NULL`; recently/frequently-bought work off `(owner, user_product_id, purchased_at)` regardless. (`04` §7.3)
 - [x] **`user_products.is_archived` soft-delete** so deletion never breaks `purchase_log` history or the `(owner, normalized_term)` unique slot. (`04` §4.3)
-- [x] **App tables hold `user_id` (`wp_users.ID`) by logical reference, no DB FK** — FKs only among `<TABLE_PREFIX>_*` tables — keeping the `AuthProvider` export seam clean. (`04` §2.4)
-- [x] **`schema_version` lives in a WP option** in Stage 1 (confirms §6 / `01` §10 at the schema level); at the Stage-3 managed-DB cutover it becomes a tiny `<TABLE_PREFIX>_meta` row so the runner is WP-independent — a **Stage-3 cutover step**, not a Stage-1 change. (`04` §6.1, `08` §9)
+- [x] **App tables hold `user_id` (`wp_users.ID`) by logical reference, no DB FK** — FKs only among `oCk_si_*` tables — keeping the `AuthProvider` export seam clean. (`04` §2.4)
+- [x] **`schema_version` lives in a WP option** in Stage 1 (confirms §6 / `01` §10 at the schema level); at the Stage-3 managed-DB cutover it becomes a tiny `oCk_si_meta` row so the runner is WP-independent — a **Stage-3 cutover step**, not a Stage-1 change. (`04` §6.1, `08` §9)
 - [x] **Refresh-token lifetime 30 days with lineage-wide reuse-detection** — the persistence default; the rotation/verification flow is `06` §5.2. (`04` §7.6)
 
 ### Resolved (folded back from `01` §14 — closed this revision)
@@ -425,10 +428,50 @@ Closed at the owner's direction (the two `10` Decision Required items):
 
 -----
 
-*Last updated: June 2026 — **demand-first revision** + **§14 consolidation**. The demand-first model (three-layer catalog: UserProduct → category bucket → StoreOffer; broad-by-default comparison; matching-by-selection; no-admin moderation; owner-level favorites + purchase log) is now reflected across the full set `00`–`09` + `CLAUDE.md`. The decisions taken in sessions `04`–`08` are folded back into §14 (`normalized_term` normalizer; brand-token anchor; categorization on `store_products`; StoreOffer/Promotion → `price_entries`; purchase-log snapshot columns; frequently-bought 8-week/≥3 default; broad-item `basis` field; empty-bucket `200`-empty; `is_archived`; logical `user_id` refs; `schema_version` placement; 30-day refresh lineage). All `01` §14 amendments closed (name, namespace, REST `si/v1`, currency, one-domain rule, identity store, custom `hash_hmac` JWT, crawler execution). Remaining opens in §14 are host facts + a few product/ops calls (table prefix, host limits / MySQL version, analytics, barcode, backup cadence, Stage-3 DB, Capacitor-vs-RN). Document set complete; ready for implementation. One wording reconciliation pending in `02` §7 (see §13 note).*
+## 15. Execution Model (how the build is actually run)
+
+> Closed at the owner's direction (this session). The architecture phase (`00`–`11`) decided
+> **what** to build; this section decides **how three actors build it** under real constraints,
+> and is the canon for `12-execution-model.md` (the process) and `13-implementation-line.md` (the
+> ordered Slice line). `12`/`13` elaborate; they re-decide nothing here.
+
+**The three actors and the governing asymmetry.** The build has a **Human Owner** (cannot code or
+test; reviews product *behaviour*, runs the app, provides screenshots/errors, approves product
+decisions), **Claude Pro** (usage-limited — spent on planning, architecture, product decisions,
+**slice design**, and **builder prompts**), and **GPT/Codex in VS Code** (implementation, tests,
+debugging, code review, practical fixes). Governing rule: **every responsibility goes to the
+cheapest actor who can do it correctly**, and its hard consequence — **Claude does not touch the
+codebase during normal implementation**; Claude emits *text artifacts*, Codex turns them into code,
+the Owner judges behaviour. Claude re-enters only for **structural** problems (architecture,
+ambiguous spec, a genuinely stuck Codex), never for mechanical ones.
+
+**The owner-confirmed choices:**
+
+- [x] **Slice = one combined document.** The builder prompt **is** the Slice — a single
+  self-contained block the Owner pastes straight into Codex (it quotes the canon it needs, so Codex
+  loads no `00`–`11`). Not a separate human-spec + Codex-prompt pair. (`12 §2`)
+- [x] **"Done" = two gates, both required.** A Slice closes only when **Codex's tests pass** *and*
+  **the Owner has confirmed the behaviour on screen** against the Slice's acceptance criteria.
+  Tests are Codex's regression net between slices; the Owner's pass is the sole place a human judges
+  the product, and judges *behaviour*, never code. (`12 §3`)
+- [x] **`13` is the full ordered MVP line.** The implementation document commits to **every** Slice
+  from empty repo to working MVP in dependency order (six milestones M0→M5), not a
+  first-milestone-then-re-slice sketch. (`13`)
+
+**Escalation (Codex-first ladder).** Behaviour-wrong-but-runs and errors/crashes → **Codex**
+(Failure-report template). Codex circling after ~2–3 tries, a bad/ambiguous Slice, or a real
+architecture/product question → **Claude** (Escalation template); type-5 architecture questions
+update `decisions.md` **first**, then `13`, then re-issue the Slice. Three fixed handoff templates
+(Slice; Failure report; Escalation) keep context-assembly off the Owner. Full detail in `12 §5`/`§6`.
+
+-----
+
+*Last updated: June 2026 — **demand-first revision** + **§14 consolidation**. The demand-first model (three-layer catalog: UserProduct → category bucket → StoreOffer; broad-by-default comparison; matching-by-selection; no-admin moderation; owner-level favorites + purchase log) is now reflected across the full set `00`–`09` + `CLAUDE.md`. The decisions taken in sessions `04`–`08` are folded back into §14 (`normalized_term` normalizer; brand-token anchor; categorization on `store_products`; StoreOffer/Promotion → `price_entries`; purchase-log snapshot columns; frequently-bought 8-week/≥3 default; broad-item `basis` field; empty-bucket `200`-empty; `is_archived`; logical `user_id` refs; `schema_version` placement; 30-day refresh lineage). All `01` §14 amendments closed (name, namespace, REST `si/v1`, currency, one-domain rule, identity store, custom `hash_hmac` JWT, crawler execution). Remaining opens in §14 are host facts + a few product/ops calls (host limits / MySQL version, analytics, barcode, backup cadence, Stage-3 DB, Capacitor-vs-RN). Document set complete; ready for implementation. One wording reconciliation pending in `02` §7 (see §13 note).*
 
 *Update — June 2026 · **`10-ux-rules.md` added** (Session 6; §§1–7 done, §§8–9 component inventory/specs next session). `10` is canonical for **screen-state and component-level UX**; `07` stays canonical for client architecture and the two-mode mechanics. Six presentational UX resolutions folded back into §14 (matching-in-progress excluded from comparison totals; cheapest-store shown with `missing_items`; Add/Search has no global catalog picker; invitations via email deep-link only; no purchase-history screen; owner-context scoping of surfaced metadata). Two new opens added to §14: brand-anchor chip label (UX **D-1**) and the sole-admin hand-off / member self-leave contract gap (**D-2**, touches `06`).*
 
 *Update — June 2026 · **D-1 and D-2 closed** (owner-approved). **D-1:** anchored brand chip = the `brand_normalized` token, title-cased client-side (brand only; no schema; Stage-2 `brands` name swaps in with no UX change). **D-2:** family membership lifecycle closed with two additive `06` routes — `PATCH …/members/{userId}` (admin role change; not ↻ fresh token) and a widened admin-or-self `DELETE …/members/{userId}` (member self-leave; solo-leave deletes the empty family); reuses existing codes, no `v2`. Updated `10` (§3.4, §4.3/§4.5, Decision Required → resolved) and `06` (§4.2/§4.3, §6.6). One minor open remains: a multi-member `DELETE /families/{id}` dissolve.*
 
 <!-- Test ред добавен от Claude през GitHub MCP — June 2026 -->
+
+*Update — June 2026 · **Execution model closed (§15)** and **`12-execution-model.md` + `13-implementation-line.md` added** (§13 table extended; `11-user-flows.md` also recorded there). The architecture set `00`–`11` is complete; the build now runs on the three-actor model — Owner (eyes + product authority), Claude (scarce text-only architecting brain), Codex (abundant hands owning the codebase) — through combined **Slices** (builder-prompt-is-the-spec), a **two-gate done** (Codex tests pass + Owner confirms behaviour), a **Codex-first escalation ladder**, and three fixed handoff templates. `13` lays out the full ordered MVP Slice line (M0 spine → M1 auth → M2 lists/terms/families → M3 crawl/ingestion → M4 matching+comparison → M5 PWA ship). Next move: author and run Slices, not more architecture documents.*

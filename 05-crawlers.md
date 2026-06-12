@@ -615,4 +615,4 @@ anti-bot, and observability. Meaning defers to `02`, representation to `04`, con
 product-to-category and persisted on `store_products.category_id` (per `04 §7.4`);
 `StoreOffer`/`Promotion` are `price_entries` rows. Open items (host
 `memory_limit`/`max_execution_time`, `resume_state` `JSON`/`TEXT`) are left to D §14, not
-invented. Placeholder `<TABLE_PREFIX>` retained throughout.*
+invented. Table prefix **resolved** to `oCk_si_` (`$wpdb->prefix` + `si_`, D §6/§14).*

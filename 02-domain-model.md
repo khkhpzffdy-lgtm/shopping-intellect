@@ -475,7 +475,7 @@ each landed; detail is not duplicated:
 - **Purchase-log offer snapshot** → resolved: snapshot columns (`store_product_id` /
   unit price / currency) defined now, populated lazily. (D §14, `04` §7.3 · §6 here)
 
-Genuinely open items remaining in `decisions.md §14` — the final table prefix, host
+Genuinely open items remaining in `decisions.md §14` — host
 `memory_limit`/`max_execution_time` + exact MySQL version, analytics, the barcode-scanner
 stage, the off-host backup cadence, and the Stage-3 managed-DB provider — are **not**
 modelling questions and do not touch this document.

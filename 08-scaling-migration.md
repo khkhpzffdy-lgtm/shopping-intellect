@@ -110,7 +110,7 @@ Cost bands for each move are **not** repeated here — they live in `09`.
    to the VPS crontab, and **disable the CPanel crawl crons in the same change** to avoid
    double-runs.
 1. Verify, then decommission the CPanel crawl crons permanently.
-- **Verify.** A full crawl completes on the VPS; `<TABLE_PREFIX>_crawl_runs` rows finalize
+- **Verify.** A full crawl completes on the VPS; `oCk_si_crawl_runs` rows finalize
   with expected counts (04 §4.6); `/health` reports fresh per-chain crawl ages (arch. §9);
   and WP web-tier latency during the crawl window returns to baseline — i.e. the trigger
   condition clears.
@@ -163,7 +163,7 @@ Cost bands for each move are **not** repeated here — they live in `09`.
   primary slots into.
 - **What moves / what stays.** *Moves:* read traffic → a read replica, **or** the whole DB
   → a managed DB (the early precursor to the Stage-3 managed DB — 03 §4). *Stays:* the
-  schema (moves as-is — clean `<TABLE_PREFIX>_*` tables, 04 §2.1), the Service classes, and
+  schema (moves as-is — clean `oCk_si_*` tables, 04 §2.1), the Service classes, and
   the migration runner (04 §6).
 - **Two sub-paths.**
   - **Read replica (lighter).** Add a replica; route read-only repository methods to it;
@@ -192,7 +192,7 @@ Cost bands for each move are **not** repeated here — they live in `09`.
   — notifications are deferred (D §1).
 - **Precondition (seam already cut).** The native shell is **Capacitor wrapping the existing
   PWA** (D §7, 03 §4), which exposes native push APIs; and the backend can store device
-  tokens in a custom `<TABLE_PREFIX>_*` table (additive — arch. §8, 04 §2.1/§6.1). FCM is a
+  tokens in a custom `oCk_si_*` table (additive — arch. §8, 04 §2.1/§6.1). FCM is a
   free tier (03 §4).
 - **What moves / adds.** *Adds:* a device-token table (additive migration — 04 §6.1), a
   thin WP-free `PushService` behind a **provider abstraction** (the same pattern as the AI
@@ -254,13 +254,13 @@ is the **relocation runbook** that uses them.
   and unchanged. When the DB moves and (Stage 3) the API goes standalone, the migration
   coordinator may no longer be WordPress. Two clean handlings: **(a)** keep WordPress as the
   migration coordinator during the transition (it still exists as CMS — 03 §5), reading the
-  option as today; or **(b)** promote `schema_version` to a tiny `<TABLE_PREFIX>_meta` row in
+  option as today; or **(b)** promote `schema_version` to a tiny `oCk_si_meta` row in
   the managed DB so the runner is WP-independent. **(b)** is the natural Stage-3 form — a
   small *additive* step recorded in the fold-back below; it does **not** change Stage 1.
 - **Cutover approach (provider-agnostic, because the provider is open — §5).**
 1. **Build target.** Run the migration runner against the empty managed DB → the schema
    exists at the current `schema_version`.
-1. **Bulk load.** Dump `<TABLE_PREFIX>_*` from SuperHosting (the *same* `mysqldump`
+1. **Bulk load.** Dump `oCk_si_*` from SuperHosting (the *same* `mysqldump`
    artifact as the backup — arch. §9, `09 §5`) and load it into the target. **Identity
    note:** if WordPress stays as CMS, `wp_users` stays on the WP DB and the standalone
    API reaches identity through the **`AuthProvider` export** (arch. §3/§8) — exactly why
@@ -334,8 +334,8 @@ This is **not a trigger.** It is continuous, additive data growth (D §11).
 - The category buckets are seeded with only **~20–30** in Stage 1 and fill **lazily from
   demand** (D §4, 02 §7, 04 §6.2). Through Stage 2, as more users and broader crawl coverage
   exercise the catalog, the buckets **broaden and deepen organically** (D §11).
-- **It is additive data growth — no schema change.** The `<TABLE_PREFIX>_categories` table
-  and the `<TABLE_PREFIX>_store_products.category_id` trust hinge are unchanged (04 §4.4),
+- **It is additive data growth — no schema change.** The `oCk_si_categories` table
+  and the `oCk_si_store_products.category_id` trust hinge are unchanged (04 §4.4),
   and lazy bucket creation is already the Stage-1 mechanism (04 §6.2). It is not gated by a
   threshold and appears in **none** of §3’s runbooks; it simply happens as the product is
   used.
@@ -391,7 +391,7 @@ record — cf. the open-question style of D §14):
    Stage 1.** `04 §6.1` keeps `schema_version` in a WP option for Stage 1 (correct,
    unchanged). This document (§4) notes that at the Stage-3 standalone-API + managed-DB
    cutover the migration coordinator may no longer be WordPress; the natural form is then a
-   tiny `<TABLE_PREFIX>_meta` row in the managed DB so the runner is WP-independent.
+   tiny `oCk_si_meta` row in the managed DB so the runner is WP-independent.
    *Proposed:* record this as a **Stage-3 cutover step**, not a Stage-1 schema change.
    (08 §4/§5)
 
@@ -408,4 +408,4 @@ maturation as additive data growth, not a trigger). Seams, conventions and tool 
 **referenced** (arch. §7, 03 §4/§5, 04 §6), not re-decided; the additive-migration
 invariant (D §11) governs every runbook. The Stage-3 managed-DB provider and the
 Capacitor-vs-RN decision are left **open** (03 §7, D §7), not pre-selected.
-`<TABLE_PREFIX>` retained throughout pending the final prefix (D §14).*
+Table prefix **resolved** to `oCk_si_` (`$wpdb->prefix` + `si_`, D §6/§14).*

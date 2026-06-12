@@ -718,4 +718,4 @@ dialog), opt-in brand anchoring, owner-level favorites + purchase log, offline-f
 last-write-wins (no conflict UI), email-only family invites with the deep-link accept screen.
 `10` stays canonical for screen-state & component behaviour; `07` for client mechanics; `06` for
 wire shapes; `02`/`00`/`D` for meaning & scope. Thirteen flows · nine screens (+ three cross-cutting
-overlays). `<TABLE_PREFIX>` not referenced (this document is flow/screen-level).*
+overlays). Table prefix not referenced (this document is flow/screen-level).*

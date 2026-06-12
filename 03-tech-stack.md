@@ -49,7 +49,7 @@ tier. Nothing in this section is optional or conditional.
 |-------------|------------------------------|----------------------------------------------------|
 |PHP          |8.x (assume; verify per D §14)|CLI mode for crawlers bypasses web limits (arch. §3)|
 |WordPress    |current stable                |Headless container, not a framework (D §6, arch. §3)|
-|MySQL        |SuperHosting default          |All persistent state; `<TABLE_PREFIX>_*` tables     |
+|MySQL        |SuperHosting default          |All persistent state; `oCk_si_*` tables     |
 |Custom plugin|`shopping-intellect/`         |PSR-4 autoload, **no Composer** (§3.1)              |
 
 Namespace `ShoppingIntellect\`, REST namespace `si/v1`, `Money` as integer euro cents

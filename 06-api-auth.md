@@ -104,7 +104,7 @@ needs **no** fresh token: the per-family role is read from `family_members` on e
   invitation management (02 §5). **Self-leave is the one member-level exception**: a member
   may `DELETE` *their own* membership (`caller == userId`) without admin role (§6.6). Because
   `roles[]` in the JWT is app-level, the *per-family* admin check reads
-  `<TABLE_PREFIX>_family_members` for that one family (cheap, single-row, 04 §4.2).
+  `oCk_si_family_members` for that one family (cheap, single-row, 04 §4.2).
 - **Not-found vs forbidden.** A resource the caller may not see returns **`404`**, not
   `403`, so the API never confirms the existence of another household’s data.
 
@@ -138,7 +138,7 @@ payload : {
 ### 5.2 Refresh token — rotation & reuse-detection flow
 
 This is the **flow**; the columns (`token_hash`, `lineage_id`, `issued_at`, `expires_at`,
-`rotated_at`, `revoked_at`) live in `<TABLE_PREFIX>_refresh_tokens` (04 §4.1). Decided
+`rotated_at`, `revoked_at`) live in `oCk_si_refresh_tokens` (04 §4.1). Decided
 persistence defaults (04 §7.6): **30-day** token lifetime; reuse-detection spans the
 **lineage’s** 30-day life.
 
@@ -689,8 +689,8 @@ limiting, the single error envelope, and additive-`v1` versioning. Written on th
 **demand-first** foundation — `list_item → user_product_id`, broad-by-default candidate &
 comparison reads with `is_promo` flags, opt-in brand anchoring, match-by-selection (no
 yes/no dialog), owner-level favorite + purchase-log metadata. Persistence defers to `04`,
-meaning to `02`, skeleton to `01`, canon to `decisions.md`. `<TABLE_PREFIX>` retained
-pending the final prefix (D §14).*
+meaning to `02`, skeleton to `01`, canon to `decisions.md`. Table prefix **resolved**
+to `oCk_si_` (`$wpdb->prefix` + `si_`, D §6/§14).*
 
 *Amended — June 2026 · **family membership lifecycle (D §14 “D-2”)**: added
 `PATCH /families/{id}/members/{userId}` (admin role change admin↔member; not ↻ fresh token)

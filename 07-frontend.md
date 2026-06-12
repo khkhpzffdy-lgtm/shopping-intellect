@@ -393,4 +393,4 @@ UserProducts (offline-born, `client_uuid`), candidates browsed across stores wit
 markers, **match by selection** (no yes/no dialog), opt-in brand anchoring, owner-level
 favorite + recently/frequently-bought from the purchase log. Consumes the `si/v1` contract
 of `06`; meaning defers to `02`, storage to `04`, skeleton to `01`, canon to
-`decisions.md`. `<TABLE_PREFIX>` retained pending the final prefix (D §14).*
+`decisions.md`. Table prefix **resolved** to `oCk_si_` (`$wpdb->prefix` + `si_`, D §6/§14).*

@@ -1108,7 +1108,7 @@ component-level UX**. Built on the **demand-first** canon — broad-by-default, 
 (no yes/no dialog), opt-in brand anchoring, owner-level favorites + purchase-log metadata,
 offline-first lists with last-write-wins (no conflict UI). `07` stays canonical for client
 architecture and the two-mode mechanics; `06` for wire shapes; `02` for meaning; `00`/`D` for
-scope. §§8–9 (component inventory & specs) are stubbed for the next session. `<TABLE_PREFIX>`
+scope. §§8–9 (component inventory & specs) are stubbed for the next session. Table prefix
 not referenced (this document is presentation-level).*
 
 *Amended — June 2026 · **D-1 and D-2 closed** (owner-approved). **D-1:** anchored brand chip =

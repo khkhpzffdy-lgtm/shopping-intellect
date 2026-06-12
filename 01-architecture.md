@@ -59,7 +59,7 @@ External: Google OAuth (token verification) · Cloudflare proxy in front of BOTH
 |**PWA**        |Cloudflare Pages, `app.<domain>`|All user UX; offline lists; sync queue                |REST API only                                  |
 |**WP + plugin**|SuperHosting, `www.<domain>`    |REST API, business logic, operator admin              |MySQL, Google OAuth                            |
 |**Crawler CLI**|Same host, CPanel cron          |Fetch → parse → validate → categorize → publish prices|Chain websites, MySQL (via same Services/Repos)|
-|**MySQL**      |SuperHosting (existing)         |All persistent state, `<TABLE_PREFIX>_*` tables       |—                                              |
+|**MySQL**      |SuperHosting (existing)         |All persistent state, `oCk_si_*` tables       |—                                              |
 
 Container notes:
 
@@ -145,7 +145,7 @@ additively — `bin/`, `Support/`, and the `Contracts/Wpdb` split are the only a
 │ (per chain)      │   ┌───────────────▼───────────────┐
 └────────┬─────────┘   │ Repositories/Contracts        │
          │ HttpClient  ├───────────────────────────────┤
-         │ interface   │ Repositories/Wpdb ($wpdb)     │──► MySQL <TABLE_PREFIX>_*
+         │ interface   │ Repositories/Wpdb ($wpdb)     │──► MySQL oCk_si_*
          ▼             └───────────────────────────────┘
    WpHttpClient (now) / CurlHttpClient (Stage-2 VPS)
 ```
@@ -289,8 +289,7 @@ the contract**, not WordPress. Guard these two and every box behind them is swap
   is normalized (case-folding, trimming, light Bulgarian stemming) is an **open
   question** (D §14) — detail in `04`.
 - **Naming.** PHP namespace `ShoppingIntellect\` · REST namespace `si/v1` · tables
-  `<TABLE_PREFIX>_*` — **final prefix TBD**, record it in `decisions.md` §6, then
-  find-and-replace the placeholder across docs.
+  `oCk_si_*` (resolved: `$wpdb->prefix` + `si_`, D §6/§14).
 - **Errors.** One JSON error envelope with stable machine-readable codes — spec in
   `06`.
 - **API versioning.** Additive changes within `v1`; breaking changes mean a `v2`
@@ -305,7 +304,7 @@ the contract**, not WordPress. Guard these two and every box behind them is swap
 values (rate limits, crawl toggles, category price ceilings) are WP options with an
 Admin UI.
 
-**Observability.** `<TABLE_PREFIX>_crawl_runs` is the source of truth for crawler
+**Observability.** `oCk_si_crawl_runs` is the source of truth for crawler
 health (status, counts, error summary, resume state) and powers the Admin dashboard;
 failures trigger `wp_mail` alerts. A public `GET /wp-json/si/v1/health` reports app
 liveness + age of last successful crawl per chain → monitored by a free UptimeRobot
@@ -334,7 +333,7 @@ per IP+identifier). Prepared statements only. Exact-origin CORS. App users hold 
 zero-capability role and are blocked from `wp-admin`; XML-RPC and other unused WP
 surface disabled. Hardening checklist in `09`.
 
-**Backups.** SuperHosting’s backups, plus a weekly `mysqldump` of `<TABLE_PREFIX>_*`
+**Backups.** SuperHosting’s backups, plus a weekly `mysqldump` of `oCk_si_*`
 to the home directory via cron; periodic manual off-host download. Risk treatment in
 `09`.
 
@@ -409,8 +408,8 @@ user action — using a list in-store — survives a total backend outage.
 1. **✅ § Identity / §6 — Name cascade:** project name **Shopping Intellect**; plugin dir
    `shopping-intellect/`; PHP namespace `ShoppingIntellect\`; REST namespace **`si/v1`**
    (replaces `groceryapp/v1`). Resolves open question 1 in §14.
-1. **§6 — Table prefix:** still open; all documents use the `<TABLE_PREFIX>`
-   placeholder until recorded.
+1. **✅ §6 — Table prefix (resolved):** `$wpdb->prefix` + `si_`, resolving to
+   `oCk_si_` on the current install (`$table_prefix = 'oCk_'`). Recorded in D §6/§14.
 1. **✅ §5 — One-domain rule (new):** PWA and API must share one registrable domain
    (`app.<domain>` + `www.<domain>`), both proxied by Cloudflare; otherwise the
    refresh-cookie flow breaks (this doc, §4).

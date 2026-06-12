@@ -38,7 +38,7 @@ is persisted** (on the product identity, not per offer) and **how StoreOffer / P
 ### 2.1 Custom tables under one MySQL — not WP post types / meta
 
 All application state lives in **custom relational tables**, every one prefixed
-`<TABLE_PREFIX>_`, in the single MySQL database the WordPress install already uses
+`oCk_si_`, in the single MySQL database the WordPress install already uses
 (arch. §3). WordPress core tables are **referenced, never extended** for app data. The
 reasons are concrete, not stylistic:
 
@@ -54,7 +54,7 @@ reasons are concrete, not stylistic:
   owner per normalized term), and append-only logs are first-class in custom InnoDB
   tables and impossible in the post/meta model.
 - **The extraction seam.** Stage 3 lifts the service classes onto a standalone API and a
-  managed DB (D §11, arch. §7). Clean `<TABLE_PREFIX>_*` tables move as-is; post/meta
+  managed DB (D §11, arch. §7). Clean `oCk_si_*` tables move as-is; post/meta
   entanglement would have to be unwound first.
 
 WordPress keeps exactly one storage job: **`wp_users`** (identity, behind `AuthProvider`
@@ -101,7 +101,7 @@ WordPress keeps exactly one storage job: **`wp_users`** (identity, behind `AuthP
   `refresh_tokens.user_id`, `families.created_by`) hold `wp_users.ID` **by value with no
   foreign key**. Hard-FK’ing app tables to a differently-prefixed WP core table would
   couple us to WordPress and fight the Stage-2/3 export of `AuthProvider` (arch. §3/§8).
-  FKs are used **only among `<TABLE_PREFIX>_*` tables**, where they are free of that
+  FKs are used **only among `oCk_si_*` tables**, where they are free of that
   coupling.
 
 `ENUM` is used for small, closed, rarely-changing sets (`owner_type`, `role`, `status`,
@@ -147,7 +147,7 @@ against invariants in **§5** to avoid repetition.
 
 `wp_users` is **referenced, never redefined** (arch. §3/§8). Two custom tables hang off it.
 
-**`<TABLE_PREFIX>_user_profiles`** — app-specific profile, 1:1 with `wp_users`. Deliberately
+**`oCk_si_user_profiles`** — app-specific profile, 1:1 with `wp_users`. Deliberately
 thin; grows additively.
 
 |Column                     |Type                |Why                                                         |
@@ -160,7 +160,7 @@ thin; grows additively.
 - **PK** `user_id`. No FK (logical ref to `wp_users`). Roles (`si_user`) and `family_ids`
   come from WP roles and `family_members` respectively, so they are **not** stored here.
 
-**`<TABLE_PREFIX>_refresh_tokens`** — persistence for the rotating refresh token (arch. §8).
+**`oCk_si_refresh_tokens`** — persistence for the rotating refresh token (arch. §8).
 The **rotation/reuse-detection flow is 06’s** (arch. §6.1); this table only stores enough
 to verify, rotate, expire and revoke. The raw token is **never stored** — only its hash.
 
@@ -181,7 +181,7 @@ to verify, rotate, expire and revoke. The raw token is **never stored** — only
 
 ### 4.2 Family
 
-**`<TABLE_PREFIX>_families`**
+**`oCk_si_families`**
 
 |Column      |Type                      |Why                                                      |
 |------------|--------------------------|---------------------------------------------------------|
@@ -193,7 +193,7 @@ to verify, rotate, expire and revoke. The raw token is **never stored** — only
 - **PK** `id`. The “≥1 admin” invariant (02 §5) is **not** expressible as a constraint and
   is enforced in the `FamilyService`.
 
-**`<TABLE_PREFIX>_family_members`** — the `User ↔ Family` join with a role.
+**`oCk_si_family_members`** — the `User ↔ Family` join with a role.
 
 |Column     |Type                                              |Why                         |
 |-----------|--------------------------------------------------|----------------------------|
@@ -207,7 +207,7 @@ to verify, rotate, expire and revoke. The raw token is **never stored** — only
   `(family_id, user_id)` — membership unique per family (02 §5). **Index** `(user_id)` —
   resolves a user’s `family_ids[]` for the JWT projection (arch. §6.1).
 
-**`<TABLE_PREFIX>_family_invitations`**
+**`oCk_si_family_invitations`**
 
 |Column                      |Type                                                                       |Why                                                                                    |
 |----------------------------|---------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
@@ -227,7 +227,7 @@ to verify, rotate, expire and revoke. The raw token is **never stored** — only
 
 ### 4.3 Shopping List — the three-layer model, layer 1 lives here
 
-**`<TABLE_PREFIX>_lists`**
+**`oCk_si_lists`**
 
 |Column                     |Type                            |Why               |
 |---------------------------|--------------------------------|------------------|
@@ -240,7 +240,7 @@ to verify, rotate, expire and revoke. The raw token is **never stored** — only
 - **PK** `id`. **Index** `(owner_type, owner_id)` — “all lists for this owner”. No owner FK
   (polymorphic).
 
-**`<TABLE_PREFIX>_user_products`** — **layer 1**, the user’s own term (02 §6). Owner-scoped,
+**`oCk_si_user_products`** — **layer 1**, the user’s own term (02 §6). Owner-scoped,
 deduped per normalized term, attaches to a bucket by default, optionally narrows to a brand.
 
 |Column                     |Type                            |Why                                                                                                |
@@ -266,7 +266,7 @@ deduped per normalized term, attaches to a bucket by default, optionally narrows
   and recovers its history) rather than a hard `DELETE`. Hard deletes are therefore
   `RESTRICT`-guarded where referenced.
 
-**`<TABLE_PREFIX>_list_items`** — references **layer 1**, never a canonical product and never
+**`oCk_si_list_items`** — references **layer 1**, never a canonical product and never
 free text (02 §6, D §9).
 
 |Column                     |Type                                  |Why                                                                 |
@@ -285,7 +285,7 @@ free text (02 §6, D §9).
   → `user_products.id` `ON DELETE RESTRICT` (a term still on a list can’t vanish — archive
   instead). **UNIQUE** `client_uuid`. **Index** `(list_id)` — the list-read path (§5.2).
 
-**`<TABLE_PREFIX>_purchase_log`** — **append-only**, immutable rows; the *only* substrate for
+**`oCk_si_purchase_log`** — **append-only**, immutable rows; the *only* substrate for
 recently/frequently-bought (02 §6, D §9).
 
 |Column            |Type                            |Why                                                  |
@@ -306,7 +306,7 @@ recently/frequently-bought (02 §6, D §9).
 
 ### 4.4 Catalog — layers 2 & 3, and the trust hinge
 
-**`<TABLE_PREFIX>_stores`** — the four chains (D §3); Sofia-flat in MVP (region/location is
+**`oCk_si_stores`** — the four chains (D §3); Sofia-flat in MVP (region/location is
 an additive Stage-2 column, 02 §13). Also holds the per-chain delta hash.
 
 |Column            |Type                           |Why                                                    |
@@ -322,7 +322,7 @@ an additive Stage-2 column, 02 §13). Also holds the per-chain delta hash.
 - **PK** `id`. **UNIQUE** `slug`. The delta hash is read by `store_id` (PK) — no extra
   index needed (§5.5).
 
-**`<TABLE_PREFIX>_categories`** — **layer 2**, the neutral CategoryBucket (02 §7). ~20–30
+**`oCk_si_categories`** — **layer 2**, the neutral CategoryBucket (02 §7). ~20–30
 admin-seeded, the rest lazily created on demand (D §4, §6.2). Flat in MVP.
 
 |Column                   |Type                           |Why                                                                               |
@@ -338,7 +338,7 @@ admin-seeded, the rest lazily created on demand (D §4, §6.2). Flat in MVP.
   `ON DELETE SET NULL`. No `parent_id` in MVP — buckets are flat; a hierarchy is an
   additive future column (02 §13).
 
-**`<TABLE_PREFIX>_store_products`** — **layer 3 identity**: the goods as listed by one store,
+**`oCk_si_store_products`** — **layer 3 identity**: the goods as listed by one store,
 stable across weekly crawls (02 §7). **Carries `category_id` — the trust hinge** (see the
 representation note below and §7.4).
 
@@ -370,7 +370,7 @@ representation note below and §7.4).
 > **derived** through its `store_product`. This realizes the *meaning* of 02’s link while
 > keeping the trust hinge a single indexed column. Flagged for fold-back in §8.
 
-**`<TABLE_PREFIX>_barcodes`** — optional strong signal on a `store_product`, Phase-2
+**`oCk_si_barcodes`** — optional strong signal on a `store_product`, Phase-2
 categorization (02 §7, D §4). A product may carry several (multipack/variant); one barcode
 value recurs across stores (which is exactly what lets Phase 2 pull offers into one bucket).
 
@@ -387,7 +387,7 @@ value recurs across stores (which is exactly what lets Phase 2 pull offers into 
 
 ### 4.5 Pricing — StoreOffer ∪ PriceEntry ∪ Promotion, one table
 
-**`<TABLE_PREFIX>_price_entries`** — the published, validated, time-bounded price for a
+**`oCk_si_price_entries`** — the published, validated, time-bounded price for a
 `store_product`. Comparison reads **only** this table (arch. §6.2, 02 §8). It is **also**
 the physical home of 02’s `StoreOffer` (the priced candidate the user browses) and
 `Promotion` (a row with `is_promo = 1`).
@@ -420,7 +420,7 @@ the physical home of 02’s `StoreOffer` (the priced candidate the user browses)
 
 ### 4.6 Crawling / Ingestion
 
-**`<TABLE_PREFIX>_crawl_runs`** — source of truth for crawler health; powers the Admin
+**`oCk_si_crawl_runs`** — source of truth for crawler health; powers the Admin
 dashboard and `/health` (arch. §9). Resumable (arch. §6.3).
 
 |Column                                                |Type                                                                       |Why                                                                                                  |
@@ -440,7 +440,7 @@ dashboard and `/health` (arch. §9). Resumable (arch. §6.3).
   Cross-run concurrency is guarded by the MySQL named lock `GET_LOCK("si_crawl_<chain>")`
   (arch. §6.3), not a DB constraint.
 
-**`<TABLE_PREFIX>_raw_offers`** — the **staged** parsed offer (02 §3/§9): the Crawling→Ingestion
+**`oCk_si_raw_offers`** — the **staged** parsed offer (02 §3/§9): the Crawling→Ingestion
 hand-off, persisted for forensic audit and offline re-categorization, **retained 8 weeks
 then pruned** (arch. §6.3, §6.5).
 
@@ -734,5 +734,5 @@ directly against the **demand-first three-layer model** (UserProduct → Categor
 StoreProduct/StoreOffer). Canonical for **representation** only; meaning defers to `02`,
 conventions to `01 §8`, decisions to `decisions.md`. The open questions in §7 are
 **resolved** this session at the owner’s direction (two as tunable defaults) and collected
-in §8 as ten paste-ready fold-back items for `decisions.md §14`. Placeholder
-`<TABLE_PREFIX>` retained throughout pending the final prefix (D §14).*
+in §8 as ten paste-ready fold-back items for `decisions.md §14`. Table prefix
+**resolved** to `oCk_si_` (`$wpdb->prefix` + `si_`, D §6/§14).*

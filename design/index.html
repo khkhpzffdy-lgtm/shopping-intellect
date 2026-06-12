@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shopping Intellect — Визуален език v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=Golos+Text:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css">
+<style>
+  html, body { margin: 0; padding: 0; }
+  * { box-sizing: border-box; }
+</style>
+</head>
+<body>
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" fill="#6D4AE6"/>
+    <path d="M30 34h44l-4 30a4 4 0 01-4 3.5H38a4 4 0 01-4-3.5L30 34z" fill="none" stroke="#fff" stroke-width="3.5" stroke-linejoin="round"/>
+    <path d="M40 67l4 6M60 67l-4 6" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="52" cy="49" r="7" fill="#fff"/>
+  </svg>
+</template>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="ui.jsx"></script>
+<script type="text/babel" src="screens2.jsx"></script>
+
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "theme": "dark",
+  "accent": "#2E8B8B",
+  "font": "Onest",
+  "radius": 12,
+  "textScale": 0.85
+}/*EDITMODE-END*/;
+
+const ACCENTS = ["#6D4AE6", "#4E63E0", "#2E8B8B", "#C24A8C"];
+
+const FRAMES = [
+  { n: 1, screen: "ListScreen", props: { initialMode: 'plan' }, t: "Списък · планиране",
+    d: "Спокоен преглед с emoji. Любимо, чип за марка, „съпоставяне на цени“. Без цени по редовете." },
+  { n: 2, screen: "ListScreen", props: { initialMode: 'shop' }, t: "Списък · пазаруване",
+    d: "Същият списък, превключен в режим за магазина: големи отметки, кой добави, работи офлайн." },
+  { n: 3, screen: "AddScreen", props: {}, t: "Добави · търсене",
+    d: "Любими и често купувани за бърз достъп, после категории. Термин извън списъка → нов продукт." },
+  { n: 4, screen: "DetailScreen", props: {}, t: "Продукт · оферти",
+    d: "Emoji герой + всички марки в 4 магазина, промо маркери, една закотвена. Тук живеят цените." },
+];
+
+function Frame({ data, theme, vars }) {
+  const Screen = window[data.screen];
+  return (
+    <div className="frame-wrap">
+      <div className="frame-cap">
+        <div className="frame-cap__n">{data.n}</div>
+        <div className="frame-cap__t">{data.t}</div>
+        <div className="frame-cap__d">{data.d}</div>
+      </div>
+      <IOSDevice width={332} height={722} dark={theme === 'dark'}>
+        <div className="si-root" data-theme={theme} style={{ height: '100%', ...vars }}>
+          <Screen {...data.props} />
+        </div>
+      </IOSDevice>
+    </div>
+  );
+}
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const vars = {
+    "--accent": t.accent,
+    "--font-sans": `'${t.font}', system-ui, sans-serif`,
+    "--radius": t.radius + "px",
+    "--radius-sm": Math.max(8, t.radius - 6) + "px",
+    "--ts": t.textScale,
+  };
+  return (
+    <div className="si-root board" data-theme={t.theme} style={vars}>
+      <div className="board__head">
+        <div>
+          <div className="board__kicker">Shopping Intellect · Визуален език v2</div>
+          <h1 className="board__title">Лилаво, emoji, тъмно &amp; светло</h1>
+          <p className="board__sub">
+            По вашите референции — но строго по правилата от документите: broad по подразбиране,
+            марката е опционален чип, цените живеят само в детайла и сравнението, спокоен режим в магазина.
+          </p>
+        </div>
+        <div className="themeswitch">
+          <button className="themeswitch__opt" data-on={t.theme === 'dark'} onClick={() => setTweak('theme', 'dark')}>
+            <span dangerouslySetInnerHTML={{ __html: '' }}></span>Тъмна
+          </button>
+          <button className="themeswitch__opt" data-on={t.theme === 'light'} onClick={() => setTweak('theme', 'light')}>
+            Светла
+          </button>
+        </div>
+      </div>
+
+      <div className="frames">
+        {FRAMES.map((f) => <Frame key={f.n} data={f} theme={t.theme} vars={vars} />)}
+      </div>
+
+      <TweaksPanel>
+        <TweakSection label="Тема" />
+        <TweakRadio label="Режим" value={t.theme} options={['dark', 'light']}
+                    onChange={(v) => setTweak('theme', v)} />
+        <TweakSection label="Акцент" />
+        <TweakColor label="Цвят" value={t.accent} options={ACCENTS}
+                    onChange={(v) => setTweak('accent', v)} />
+        <TweakSection label="Достъпност" />
+        <TweakSlider label="Размер на текста" value={t.textScale} min={0.85} max={1.35} step={0.05} unit="×"
+                     onChange={(v) => setTweak('textScale', v)} />
+        <TweakSection label="Шрифт &amp; форма" />
+        <TweakSelect label="Шрифт" value={t.font}
+                     options={['Onest', 'Golos Text', 'Manrope']}
+                     onChange={(v) => setTweak('font', v)} />
+        <TweakSlider label="Радиус" value={t.radius} min={8} max={26} step={1} unit="px"
+                     onChange={(v) => setTweak('radius', v)} />
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

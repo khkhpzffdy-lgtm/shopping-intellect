@@ -1,2 +1,5 @@
 # macOS
 .DS_Store
+
+# Plugin code lives in its own repo (nested git)
+plugin/

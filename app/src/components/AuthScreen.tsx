@@ -13,7 +13,7 @@ export const AuthScreen = () => {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const submitLabel = mode === 'login' ? 'Log in' : 'Create account';
+  const submitLabel = mode === 'login' ? 'Вход' : 'Регистрация';
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -39,102 +39,117 @@ export const AuthScreen = () => {
     }
   };
 
+  const inputStyle = {
+    background: 'var(--input)',
+    borderColor: 'var(--line)',
+    color: 'var(--ink)',
+    borderRadius: 'var(--radius-sm)'
+  };
+
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-10">
-      <div className="grid w-full max-w-5xl gap-6 rounded-[2rem] border border-white/60 bg-white/80 p-6 shadow-shell md:grid-cols-[1.1fr_0.9fr] md:p-8">
-        <section className="rounded-[1.75rem] bg-pine p-8 text-white">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-white/70">
-            Shopping Intellect
-          </p>
-          <h1 className="mt-4 text-4xl font-semibold leading-tight">
-            A fast shell that keeps the session in memory and the refresh token in the cookie.
-          </h1>
-          <p className="mt-5 max-w-lg text-base leading-7 text-white/78">
-            Register or log in to land on the empty home state. Reloading the page should keep
-            you inside the app without ever writing the access token to browser storage.
-          </p>
-          <div className="mt-10 rounded-[1.5rem] border border-white/20 bg-white/10 p-5">
-            <p className="text-sm uppercase tracking-[0.2em] text-white/65">Soon</p>
-            <p className="mt-2 text-lg font-medium">Sign in with Google</p>
-            <p className="mt-2 text-sm text-white/70">Visual placeholder only in this slice.</p>
-          </div>
-        </section>
+    <main className="flex min-h-screen items-center justify-center px-4 py-10" style={{ background: 'var(--bg)' }}>
+      <div
+        className="w-full max-w-md p-6"
+        style={{ background: 'var(--card)', borderRadius: 'var(--radius)', border: '1px solid var(--card-border)', boxShadow: 'var(--shadow)' }}
+      >
+        <p style={{ color: 'var(--accent)', fontSize: 'var(--fs-sm)', fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase' }}>
+          Shopping Intellect
+        </p>
+        <h1 className="mt-2" style={{ color: 'var(--ink)', fontSize: 'var(--fs-h1)', fontWeight: 600 }}>
+          {mode === 'login' ? 'Вход в профила' : 'Създаване на профил'}
+        </h1>
 
-        <section className="rounded-[1.75rem] bg-canvas/70 p-6">
-          <div className="inline-flex rounded-full bg-white p-1 shadow-sm">
-            <button
-              type="button"
-              aria-label="Switch to log in"
-              onClick={() => setMode('login')}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                mode === 'login' ? 'bg-pine text-white' : 'text-ink/70'
-              }`}
-            >
-              Log in
-            </button>
-            <button
-              type="button"
-              aria-label="Switch to register"
-              onClick={() => setMode('register')}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                mode === 'register' ? 'bg-pine text-white' : 'text-ink/70'
-              }`}
-            >
-              Register
-            </button>
-          </div>
+        <div className="mt-5 inline-flex p-1" style={{ background: 'var(--card-2)', borderRadius: 'var(--radius-sm)' }}>
+          <button
+            type="button"
+            aria-label="Switch to log in"
+            onClick={() => setMode('login')}
+            style={{
+              borderRadius: 'var(--radius-sm)',
+              fontSize: 'var(--fs-sm)',
+              padding: '8px 16px',
+              fontWeight: 600,
+              background: mode === 'login' ? 'var(--accent)' : 'transparent',
+              color: mode === 'login' ? 'var(--on-accent)' : 'var(--ink-2)'
+            }}
+          >
+            Вход
+          </button>
+          <button
+            type="button"
+            aria-label="Switch to register"
+            onClick={() => setMode('register')}
+            style={{
+              borderRadius: 'var(--radius-sm)',
+              fontSize: 'var(--fs-sm)',
+              padding: '8px 16px',
+              fontWeight: 600,
+              background: mode === 'register' ? 'var(--accent)' : 'transparent',
+              color: mode === 'register' ? 'var(--on-accent)' : 'var(--ink-2)'
+            }}
+          >
+            Регистрация
+          </button>
+        </div>
 
-          <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-            {mode === 'register' ? (
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-ink">Display name</span>
-                <input
-                  required
-                  value={displayName}
-                  onChange={(event) => setDisplayName(event.target.value)}
-                  className="w-full rounded-2xl border border-pine/15 bg-white px-4 py-3 text-base outline-none transition focus:border-pine"
-                />
-              </label>
-            ) : null}
-
+        <form className="mt-5 space-y-3" onSubmit={handleSubmit}>
+          {mode === 'register' ? (
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-ink">Email</span>
+              <span className="mb-1 block" style={{ fontSize: 'var(--fs-sm)', color: 'var(--ink-2)' }}>Display name</span>
               <input
                 required
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-2xl border border-pine/15 bg-white px-4 py-3 text-base outline-none transition focus:border-pine"
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                className="w-full border px-4 py-3 outline-none transition"
+                style={inputStyle}
               />
             </label>
+          ) : null}
 
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-ink">Password</span>
-              <input
-                required
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className="w-full rounded-2xl border border-pine/15 bg-white px-4 py-3 text-base outline-none transition focus:border-pine"
-              />
-            </label>
+          <label className="block">
+            <span className="mb-1 block" style={{ fontSize: 'var(--fs-sm)', color: 'var(--ink-2)' }}>Email</span>
+            <input
+              required
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              className="w-full border px-4 py-3 outline-none transition"
+              style={inputStyle}
+            />
+          </label>
 
-            {error ? (
-              <p role="alert" className="rounded-2xl bg-coral/10 px-4 py-3 text-sm font-medium text-coral">
-                {error}
-              </p>
-            ) : null}
+          <label className="block">
+            <span className="mb-1 block" style={{ fontSize: 'var(--fs-sm)', color: 'var(--ink-2)' }}>Password</span>
+            <input
+              required
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="w-full border px-4 py-3 outline-none transition"
+              style={inputStyle}
+            />
+          </label>
 
-            <button
-              type="submit"
-              aria-label={mode === 'login' ? 'Submit log in' : 'Submit registration'}
-              disabled={isSubmitting}
-              className="w-full rounded-2xl bg-pine px-4 py-3 text-sm font-semibold text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
+          {error ? (
+            <p
+              role="alert"
+              className="px-4 py-3"
+              style={{ borderRadius: 'var(--radius-sm)', background: 'color-mix(in srgb, var(--danger) 16%, var(--card))', color: 'var(--danger)', fontSize: 'var(--fs-sm)', fontWeight: 500 }}
             >
-              {isSubmitting ? 'Working...' : submitLabel}
-            </button>
-          </form>
-        </section>
+              {error}
+            </p>
+          ) : null}
+
+          <button
+            type="submit"
+            aria-label={mode === 'login' ? 'Submit log in' : 'Submit registration'}
+            disabled={isSubmitting}
+            className="w-full px-4 py-3 transition disabled:cursor-not-allowed disabled:opacity-70"
+            style={{ borderRadius: 'var(--radius-sm)', background: 'var(--accent)', color: 'var(--on-accent)', fontSize: 'var(--fs-sm)', fontWeight: 600 }}
+          >
+            {isSubmitting ? 'Моля, изчакайте...' : submitLabel}
+          </button>
+        </form>
       </div>
     </main>
   );

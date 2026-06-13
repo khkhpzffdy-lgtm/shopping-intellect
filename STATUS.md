@@ -92,8 +92,13 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
   `[data-theme="dark"|"light"]` ported from `design/app.css`), `store/theme.ts`
   (zustand, persists `'light'|'dark'` to `localStorage` under `si-theme`, defaults
   to `'dark'`), wired onto a `.si-root` wrapper in `App.tsx` via `data-theme`.
-  Onest + JetBrains Mono loaded via Google Fonts in `index.html`. No toggle UI yet
-  (next slice) and no "system theme" option (intentionally, per product rule).
+  Onest + JetBrains Mono loaded via Google Fonts in `index.html`. No "system theme"
+  option (intentionally, per product rule).
+- **Restyle to design/ tokens (done):** `AuthScreen`, `HomeScreen`, and
+  `EmptyState` now use `theme.css` variables (`--bg`, `--card`, `--ink`, `--accent`,
+  `--radius`, `--fs-*`) instead of ad-hoc Tailwind colors. `HomeScreen` has a
+  Светла/Тъмна theme toggle wired to `store/theme.ts`'s `setTheme`. A dedicated
+  Профил screen is still a future slice.
 
 This list is **not guaranteed complete or current** — if it looks stale, check
 `app/src/components/` and `app/src/App.tsx` directly rather than trusting this.

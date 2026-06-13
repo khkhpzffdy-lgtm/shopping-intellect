@@ -58,6 +58,20 @@ test('boot 401 shows the auth screen', async () => {
   expect(screen.queryByText('No lists yet')).not.toBeInTheDocument();
 });
 
+test('defaults to the dark theme with no stored preference', async () => {
+  mockFetch.mockResolvedValueOnce(
+    new Response(JSON.stringify({ code: 'token_invalid' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  );
+
+  const { container } = renderApp();
+
+  await screen.findByLabelText('Email');
+  expect(container.querySelector('.si-root')).toHaveAttribute('data-theme', 'dark');
+});
+
 test('boot 200 shows home and keeps token out of storage', async () => {
   const accessToken = makeToken({ user_id: 42, family_ids: [7], display_name: 'Dora' });
   const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');

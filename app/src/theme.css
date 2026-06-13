@@ -1,0 +1,86 @@
+/* ============================================================
+   Shopping Intellect — design tokens
+   Dark + Light themes via [data-theme] on .si-root.
+   Dynamic Type via --ts. Contrast-safe chip tokens.
+   ============================================================ */
+
+.si-root {
+  --font-sans: 'Onest', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* accent — purple by default (Tweakable) */
+  --accent:       #6D4AE6;
+  --accent-press: #5B39D6;
+  --on-accent:    #FFFFFF;
+
+  --promo:  #C98A12;
+  --danger: #E0524A;
+
+  --radius:    18px;
+  --radius-sm: 12px;
+
+  /* ---- Dynamic Type: one multiplier scales all UI text ---- */
+  --ts: 1;
+  --fs-display: calc(25px  * var(--ts));  /* hero product title */
+  --fs-h1:      calc(20px  * var(--ts));  /* sheet titles, section headers */
+  --fs-h2:      calc(17.5px * var(--ts)); /* list switcher, shopping row name */
+  --fs-title:   calc(15.5px * var(--ts)); /* item names, app brand */
+  --fs-body:    calc(14px  * var(--ts));  /* secondary, candidate name */
+  --fs-sm:      calc(13px  * var(--ts));  /* qty, chips, labels */
+  --fs-xs:      calc(11.5px * var(--ts)); /* meta, tabs */
+  --fs-mono:    calc(10.5px * var(--ts)); /* store labels */
+
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---------- DARK ---------- */
+.si-root[data-theme="dark"] {
+  --bg:        #0B0B0F;
+  --card:      #17171E;
+  --card-2:    #20202A;
+  --input:     #20202A;
+  --ink:       #F4F4F7;
+  --ink-2:     #ADADBA;   /* lifted for contrast */
+  --ink-3:     #7C7C8A;   /* lifted for contrast */
+  --line:      rgba(255,255,255,0.08);
+  --line-2:    rgba(255,255,255,0.14);
+  --placeholder: #8E8E9C;
+  --accent-soft:  color-mix(in srgb, var(--accent) 26%, #15151B);
+  --accent-tint:  color-mix(in srgb, var(--accent) 16%, #15151B);
+  --chip-bg:      color-mix(in srgb, var(--accent) 30%, #15151B);
+  --chip-text:    color-mix(in srgb, var(--accent) 30%, #FFFFFF);
+  --promo-soft:   color-mix(in srgb, var(--promo) 26%, #15151B);
+  --promo-text:   color-mix(in srgb, var(--promo) 35%, #FFFFFF);
+  --shadow:    0 8px 30px rgba(0,0,0,0.45);
+  --fab-shadow: 0 10px 26px rgba(109,74,230,0.40);
+  --card-border: var(--line);
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* ---------- LIGHT ---------- */
+.si-root[data-theme="light"] {
+  --bg:        #FFFFFF;
+  --card:      #F7F7FA;
+  --card-2:    #FFFFFF;
+  --input:     #EFEFF3;
+  --ink:       #18181F;
+  --ink-2:     #5E5E6B;   /* darkened for contrast */
+  --ink-3:     #8C8C99;   /* darkened for contrast */
+  --line:      #EAEAEF;
+  --line-2:    #DCDCE4;
+  --placeholder: #8C8C99;
+  --accent-soft:  color-mix(in srgb, var(--accent) 15%, #FFFFFF);
+  --accent-tint:  color-mix(in srgb, var(--accent) 12%, #FFFFFF);
+  --chip-bg:      color-mix(in srgb, var(--accent) 14%, #FFFFFF);
+  --chip-text:    color-mix(in srgb, var(--accent) 72%, #18181F);
+  --promo-soft:   color-mix(in srgb, var(--promo) 16%, #FFFFFF);
+  --promo-text:   color-mix(in srgb, var(--promo) 80%, #18181F);
+  --shadow:    0 8px 28px rgba(24,24,31,0.10);
+  --fab-shadow: 0 10px 24px rgba(109,74,230,0.30);
+  --card-border: var(--line);
+  background: var(--bg);
+  color: var(--ink);
+}

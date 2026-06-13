@@ -87,7 +87,8 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 | §1.3 | JWT issuer/verifier (HS256, custom `hash_hmac`) | ✅ done |
 | §1.4 | Auth REST endpoints (register/login/refresh/logout, email/password) | ✅ done |
 | §1.4b | Google OAuth login (`POST /auth/google`) | ✅ done |
-| §1.5+ | Everything after §1.4b | ❌ not started |
+| §1.5 | App shell + auth screen + silent-refresh boot (email/password + Google) | ✅ done — M1 closed |
+| §2.1+ | Everything after §1.5 (M2 — Lists, terms & families) | ❌ not started |
 
 **App (`app/`):** Vite + React PWA, FTP deploy wired. Implemented so far:
 - `AuthScreen` — register/login screen, working against the plugin's auth endpoints
@@ -124,25 +125,36 @@ wp-admin, with a form (Client ID + Client Secret) that writes
 `options.php` — no DB access needed, the Owner sets these directly in
 wp-admin.
 
-**§1.5 (frontend Google button) — done:** `AuthScreen` shows a "Вход с Google"
-button below the email/password form when `VITE_GOOGLE_CLIENT_ID` is set
+**§1.5 (frontend Google button) — done, Owner-confirmed working on
+shopping.flux.bg (2026-06-13):** `AuthScreen` shows a "Вход с Google" button
+below the email/password form when `VITE_GOOGLE_CLIENT_ID` is set
 (`app/src/api/session.ts` `googleAuthUrl()`); it redirects to Google's OAuth
-consent screen with `redirect_uri` = the app's own origin+path. On return,
-`App.tsx` boot picks up `?code=...`, strips it from the URL, and calls
-`POST /auth/google` (`api/client.ts` `loginWithGoogle`), landing on the same
-session flow as email/password. **Needs a `VITE_GOOGLE_CLIENT_ID` build env var** — without it the button is
-hidden. Wired into `.github/workflows/deploy.yml` as
-`secrets.VITE_GOOGLE_CLIENT_ID`; **the Owner must add a `VITE_GOOGLE_CLIENT_ID`
-repo secret** (GitHub → repo → Settings → Secrets and variables → Actions) with
-the Google OAuth client ID, and add it to `app/.env.local` for local dev. The
-Google client ID's "Authorized redirect URIs" in Google Cloud Console must
-include the app's origin (e.g. `https://app.<domain>/`), matching what
-`googleRedirectUri()` sends.
+consent screen. `googleRedirectUri()` returns a **fixed** URI
+(`https://shopping.flux.bg/`), not derived from `window.location` — the
+dynamic version broke with `redirect_uri_mismatch` when the app was reached
+via `www.` or `http://` variants of the domain, since Google requires an
+exact registered match. On return, `App.tsx` boot picks up `?code=...`, strips
+it from the URL, and calls `POST /auth/google` (`api/client.ts`
+`loginWithGoogle`), landing on the same session flow as email/password.
 
-**Next up:** whatever the next unstarted M1/M2 slice is in
-`13-implementation-line.md` (M1 closes after §1.5; M2 starts at §2.1) — check
-there for the spec before starting. Cross-check against the files above so you
-don't re-build something that already exists.
+Fully configured and live:
+- GitHub repo secret `VITE_GOOGLE_CLIENT_ID` is set (root repo).
+- wp-admin **Settings → SI Google Sign-In** (`GoogleSettingsPage`) has real
+  `si_google_client_id` / `si_google_client_secret` values set.
+- Google Cloud Console OAuth client has `https://shopping.flux.bg/` in
+  "Authorized redirect URIs".
+
+**M1 is closed** — register/login/reload/logout works for both email/password
+and Google on shopping.flux.bg.
+
+**Next up: §2.1 — UserProduct create-on-write + owner-scoped term
+normalization** (start of M2, `13-implementation-line.md` line ~131). Goal:
+writing a term creates a `UserProduct` for the list's owner, deduped on
+`(owner, normalized_term)` (NFC+lowercase+trim+collapse+punctuation-strip, no
+stemming — `04 §7.1`). Iron rule: `list_items` reference `user_product_id`,
+never free text or a canonical product (CLAUDE.md §3); offline-born
+`user_products` need a `client_uuid` for idempotent sync (§2.6). Check
+`decisions.md` §14 for the open normalizer question before starting.
 
 ---
 

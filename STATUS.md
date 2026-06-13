@@ -106,12 +106,19 @@ This list is **not guaranteed complete or current** — if it looks stale, check
 
 **§1.4b (Google OAuth login) notes:** `POST /auth/google` is wired
 (`AuthController::handleGoogle`, `AuthService::loginWithGoogle`,
-`GoogleAuthVerifier` in `Repositories/Wp/`). Two WP options must be set in
-wp-admin before real Google logins work: `si_google_client_id` and
+`GoogleAuthVerifier` in `Repositories/Wp/`). Two WP options must be set
+before real Google logins work: `si_google_client_id` and
 `si_google_client_secret` (read via `Config::googleClientId()` /
 `googleClientSecret()` from `get_option()`). Until those are set to real Google
 OAuth credentials, the token exchange will fail and the endpoint returns
 `401 google_verification_failed` (expected/safe default).
+
+**wp-admin settings page (done):** `GoogleSettingsPage`
+(`src/Admin/GoogleSettingsPage.php`) adds **Settings → SI Google Sign-In** in
+wp-admin, with a form (Client ID + Client Secret) that writes
+`si_google_client_id` / `si_google_client_secret` via `register_setting` /
+`options.php` — no DB access needed, the Owner sets these directly in
+wp-admin.
 
 **§1.5 (frontend Google button) — done:** `AuthScreen` shows a "Вход с Google"
 button below the email/password form when `VITE_GOOGLE_CLIENT_ID` is set

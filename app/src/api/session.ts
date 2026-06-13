@@ -96,7 +96,7 @@ export const refreshSession = async (): Promise<AuthEnvelope> => {
   }
 };
 
-export const googleRedirectUri = () => `${window.location.origin}${window.location.pathname}`;
+export const googleRedirectUri = () => 'https://shopping.flux.bg/';
 
 export const googleAuthUrl = (): string | null => {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;

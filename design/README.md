@@ -72,4 +72,5 @@ in `00-overview.md`:
   store, no conflict UI.
 
 Theme switching lives in the board header here; in the real app it belongs in **Профил**
-as a Светла / Тъмна / Системна setting.
+as a manual **Светла / Тъмна** toggle — **exactly these two themes, no "Системна" /
+OS-driven option, ever.** Logged-out screens (e.g. auth) default to **dark**.

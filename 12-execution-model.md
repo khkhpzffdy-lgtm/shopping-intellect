@@ -82,6 +82,12 @@ sized so Codex can build it in one or a few sessions **without needing Claude ag
 ```
 SLICE <13-§n.m> — <one-line name>
 
+BUDGET
+  Target: <one Codex session, under ~20 min, under ~150 changed lines (excluding
+  generated lockfiles)>. If you're past this and still not green, STOP — do not keep
+  iterating. Report what's done, what's failing, and hand back per escalation §5
+  (type 3) rather than burning more time/tokens.
+
 GOAL
   <one sentence, product-level: what the user/operator can do after this slice that they
    couldn't before>
@@ -111,9 +117,23 @@ ACCEPTANCE CRITERIA  (the Owner verifies these by clicking/looking — no dev kn
   [ ] <observable behaviour 1>
   [ ] <observable behaviour 2>
 
+SHIP IT YOURSELF — no questions about repo/env/deploy/access
+  - Read STATUS.md first — it has the repo paths, remotes, branches, and deploy
+    targets. Don't ask the Owner where the code lives, how it deploys, or for
+    credentials; STATUS.md answers this. If something there is wrong or missing,
+    fix STATUS.md as part of this slice.
+  - Commit and push to the correct repo/branch per STATUS.md so CI deploys it
+    (plugin → `staging` or `main` in shopping-intellect-plugin; app → `main` in
+    shopping-intellect, paths under app/**).
+  - Before reporting done, update STATUS.md §3: mark this slice ✅ done and move
+    "Next up" to the following slice.
+
 DONE =
-  Codex's tests pass  AND  the Owner has confirmed every acceptance criterion on screen.
-  (Both gates required — D §15.)
+  Codex's tests pass  AND  the code is pushed/deployed per STATUS.md  AND
+  STATUS.md §3 is updated  AND  the Owner has confirmed every acceptance criterion
+  on shopping.flux.bg.
+  (All required — D §15 covers the first/last; the push+doc update are this
+  project's addition so the Owner never has to ask "is it live yet?".)
 ```
 
 Two properties make the Slice cheap to run:

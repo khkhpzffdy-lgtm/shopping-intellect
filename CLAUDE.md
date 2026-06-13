@@ -2,7 +2,10 @@
 
 > **Load when:** **always.** This is the first file in every Claude Code session on
 > this project. It orients; it does not specify.
-> **Depends on:** `decisions.md` (the canon — load it alongside this file).
+> **Depends on:** `decisions.md` (the canon — load it alongside this file) and
+> **`STATUS.md`** (repos, environments, deploy targets, and what's actually built —
+> load it too, every session, before touching code or asking the user about
+> environments/access).
 > **Standalone for:** nothing. It is a map, not a source. Every concrete decision,
 > schema, contract, or spec lives in `decisions.md` and `00`–`09`; this file tells you
 > *which* one to open and *which* rules you may never break.

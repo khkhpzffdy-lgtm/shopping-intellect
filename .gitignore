@@ -11,3 +11,4 @@ app/dist/
 app/*.tsbuildinfo
 app/live-dist/
 app/root-live/
+app/dist-live/

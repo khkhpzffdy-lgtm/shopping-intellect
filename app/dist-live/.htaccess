@@ -1,9 +1,0 @@
-RewriteEngine On
-
-# Let real files and directories resolve normally.
-RewriteCond %{REQUEST_FILENAME} -f [OR]
-RewriteCond %{REQUEST_FILENAME} -d
-RewriteRule ^ - [L]
-
-# Route SPA requests back to the app shell.
-RewriteRule ^ index.html [L]

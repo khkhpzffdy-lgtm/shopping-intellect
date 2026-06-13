@@ -31,6 +31,10 @@ jobs:
         env:
           VITE_API_BASE_URL: https://shopping.flux.bg/wp-json/si/v1
 
+      - name: Copy .htaccess into build output
+        working-directory: app
+        run: cp .htaccess dist/.htaccess
+
       - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -40,3 +44,13 @@ jobs:
           protocol: ftps
           local-dir: app/dist/
           server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          exclude: |
+            wp-admin/**
+            wp-includes/**
+            wp-content/**
+            wp-login.php
+            wp-config.php
+            xmlrpc.php
+            wp-*.php
+            index.php
+            wp-cron.php

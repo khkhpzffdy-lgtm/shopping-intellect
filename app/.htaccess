@@ -1,0 +1,19 @@
+# BEGIN Shopping Intellect app + WordPress coexistence
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteBase /
+
+# Serve existing WordPress/app files and directories as-is
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Route the REST API and WordPress admin/login through WP's front controller
+RewriteCond %{REQUEST_URI} ^/(wp-admin/|wp-json|xmlrpc\.php) [NC]
+RewriteRule ^(wp-admin/.*\.php)$ $1 [L]
+RewriteRule ^ index.php [L]
+
+# Everything else (app routes) falls back to the SPA shell
+RewriteRule ^ index.html [L]
+</IfModule>
+# END Shopping Intellect app + WordPress coexistence

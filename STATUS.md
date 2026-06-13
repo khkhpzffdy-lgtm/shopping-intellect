@@ -81,8 +81,9 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 | §1.1 | Repository contracts + first Wpdb implementations | ✅ done (bundled with §1.2/§1.4 commits) |
 | §1.2 | `AuthProvider`/`UserRepository` over `wp_users` + `si_user` role | ✅ done |
 | §1.3 | JWT issuer/verifier (HS256, custom `hash_hmac`) | ✅ done |
-| §1.4 | Auth REST endpoints (register/login/refresh/logout) | ✅ done |
-| §1.5+ | Everything after auth | ❌ not started |
+| §1.4 | Auth REST endpoints (register/login/refresh/logout, email/password) | ✅ done |
+| §1.4b | Google OAuth login (`POST /auth/google`) | ✅ done |
+| §1.5+ | Everything after §1.4b | ❌ not started |
 
 **App (`app/`):** Vite + React PWA, FTP deploy wired. Implemented so far:
 - `AuthScreen` — register/login screen, working against the plugin's auth endpoints
@@ -103,9 +104,18 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 This list is **not guaranteed complete or current** — if it looks stale, check
 `app/src/components/` and `app/src/App.tsx` directly rather than trusting this.
 
-**Next up:** whatever the next unstarted M1 slice is in `13-implementation-line.md`
-— check there for the spec before starting. Cross-check against the files above so
-you don't re-build something that already exists.
+**§1.4b (Google OAuth login) notes:** `POST /auth/google` is wired
+(`AuthController::handleGoogle`, `AuthService::loginWithGoogle`,
+`GoogleAuthVerifier` in `Repositories/Wp/`). Two WP options must be set in
+wp-admin before real Google logins work: `si_google_client_id` and
+`si_google_client_secret` (read via `Config::googleClientId()` /
+`googleClientSecret()` from `get_option()`). Until those are set to real Google
+OAuth credentials, the token exchange will fail and the endpoint returns
+`401 google_verification_failed` (expected/safe default).
+
+**Next up:** §1.5 (frontend "Sign in with Google" button / OAuth redirect flow)
+— check `13-implementation-line.md` for the spec before starting. Cross-check
+against the files above so you don't re-build something that already exists.
 
 ---
 

@@ -100,19 +100,26 @@ reload, and stay logged in — with the JWT/refresh discipline intact.*
 - **Iron:** JWT via core `hash_hmac`, never a WP-JWT plugin (§2.2); claim set is the contract, no issuer/WP leak (§5).
 - **Owner sees:** (operator) tests prove issue→verify round-trip + tamper rejection; Owner confirms green.
 
-### §1.4 — Register + login endpoints (email/password + Google) with refresh-cookie flow
-- **Goal:** `si/v1` register + login + refresh + logout; access token returned in body (memory-only), refresh token in an `httpOnly Secure` cookie with 30-day lineage + reuse detection.
+### §1.4 — Register + login endpoints (email/password) with refresh-cookie flow
+- **Goal:** `si/v1` register + login + refresh + logout; access token returned in body (memory-only), refresh token in an `httpOnly Secure` cookie with 30-day lineage + reuse detection. Google login is split out as **§1.4b**.
 - **Dep:** §1.3
 - **Canon:** `06 §3`–`§5.2` (endpoints, refresh rotation/lineage) · `06` CORS · `decisions.md` refresh 30-day + reuse-detection (§14) · `01 §9`.
 - **Iron:** access JWT in memory only, refresh in `httpOnly Secure` cookie; exact-origin CORS (§2.8).
 - **Owner sees:** (operator/early UI) hitting the endpoints (or a throwaway form) registers + logs in and sets the refresh cookie; bad password rejected.
 
-### §1.5 — App shell + auth screen + silent-refresh boot (first real screen)
-- **Goal:** the PWA shell boots, attempts silent refresh, and shows the auth screen when there's no session; successful login lands on an (empty) home.
+### §1.4b — Google OAuth login (`/auth/google`)
+- **Goal:** `si/v1` `POST /auth/google` — exchange a Google authorization code, verify with Google, find-or-create the `wp_users` record, and return the **identical** `{ auth, user }` shape as `/auth/login` (provider-blind output, `06 §6.1`/`§7.2`), setting the same refresh cookie.
 - **Dep:** §1.4
-- **Canon:** `07 §3` (shell, silent-refresh boot) · `11 Flow 1`/`Flow 13` (first run; cold/offline boot) · `10` (auth is a leaf screen — flagged Open-for-design, `11`); `06 §5` (refresh).
+- **Canon:** `06 §6.1` (endpoint spec, lines 214–221) · `06 §7.2` (provider-blind output) · `decisions.md` §8/§14 (Identity store, `AuthProvider` abstraction, Apple/Facebook future).
+- **Iron:** access JWT in memory only, refresh in `httpOnly Secure` cookie (§2.8); identity stays behind `AuthProvider` — no provider-specific shape leaks past it (D §14).
+- **Owner sees:** (operator/early UI) hitting `/auth/google` with a valid Google auth code logs in or creates the `si_user` account and sets the refresh cookie, with a response indistinguishable from `/auth/login`; `401 google_verification_failed` on a bad/expired code.
+
+### §1.5 — App shell + auth screen + silent-refresh boot (first real screen)
+- **Goal:** the PWA shell boots, attempts silent refresh, and shows the auth screen (email/password **and** "Sign in with Google" button) when there's no session; successful login (either provider) lands on an (empty) home.
+- **Dep:** §1.4b
+- **Canon:** `07 §3` (shell, silent-refresh boot) · `11 Flow 1`/`Flow 13` (first run; cold/offline boot) · `10` (auth is a leaf screen — flagged Open-for-design, `11`); `06 §5` (refresh) · `06 §6.1` (Google button → `/auth/google`).
 - **Iron:** access JWT in memory only (§2.8).
-- **Owner sees:** opens `app.<domain>`, registers/logs in, reloads the page, **stays logged in**; logging out returns to the auth screen.
+- **Owner sees:** opens `app.<domain>`, registers/logs in with email/password **or** Google, reloads the page, **stays logged in**; logging out returns to the auth screen.
 
 -----
 

@@ -88,7 +88,8 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 | §1.4 | Auth REST endpoints (register/login/refresh/logout, email/password) | ✅ done |
 | §1.4b | Google OAuth login (`POST /auth/google`) | ✅ done |
 | §1.5 | App shell + auth screen + silent-refresh boot (email/password + Google) | ✅ done — M1 closed |
-| §2.1+ | Everything after §1.5 (M2 — Lists, terms & families) | ❌ not started |
+| §2.1 | UserProduct create-on-write + owner-scoped term normalization | ✅ done |
+| §2.2+ | Everything after §2.1 (M2 — Lists, terms & families) | ❌ not started |
 
 **App (`app/`):** Vite + React PWA, FTP deploy wired. Implemented so far:
 - `AuthScreen` — register/login screen, working against the plugin's auth endpoints
@@ -147,14 +148,15 @@ Fully configured and live:
 **M1 is closed** — register/login/reload/logout works for both email/password
 and Google on shopping.flux.bg.
 
-**Next up: §2.1 — UserProduct create-on-write + owner-scoped term
-normalization** (start of M2, `13-implementation-line.md` line ~131). Goal:
-writing a term creates a `UserProduct` for the list's owner, deduped on
-`(owner, normalized_term)` (NFC+lowercase+trim+collapse+punctuation-strip, no
-stemming — `04 §7.1`). Iron rule: `list_items` reference `user_product_id`,
-never free text or a canonical product (CLAUDE.md §3); offline-born
-`user_products` need a `client_uuid` for idempotent sync (§2.6). Check
-`decisions.md` §14 for the open normalizer question before starting.
+**§2.1 (done):** standalone `UserProduct` create-on-write is wired in the plugin:
+`Support/TermNormalizer`, `Services/UserProductService`, and
+`GET/POST /wp-json/si/v1/user-products` are implemented and PHPUnit-covered.
+The service dedupes on `(owner_type, owner_id, normalized_term)`, un-archives
+soft-deleted matches, and generates `client_uuid` values with the shared UUIDv4
+helper used by auth refresh lineage IDs.
+
+**Next up: §2.2 — Two-mode list (build/shop) with offline optimistic queue**
+(`13-implementation-line.md` line ~138).
 
 ---
 

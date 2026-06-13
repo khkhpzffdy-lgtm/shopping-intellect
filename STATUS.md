@@ -45,9 +45,13 @@ push to the plugin repo's `staging` branch. Do not propose "run it locally in WP
 ### Plugin repo (`shopping-intellect-plugin`)
 - **CI (`.github/workflows/deploy.yml`):** runs `phpunit.phar` on every push to
   `main` or `staging`.
-- **`main` → production**, via SSH + `rsync` to a live WP install (secrets:
-  `SSH_HOST/PORT/USER/SSH_PRIVATE_KEY/SSH_TARGET_PATH`). Excludes `tests/`,
-  `.github/`, `phpunit.*`.
+- **`main` → production**, via FTP to a live WP install (secrets:
+  `PROD_FTP_HOST/PROD_FTP_USER/PROD_FTP_PASSWORD/PROD_FTP_PATH`, `PROD_FTP_PATH`
+  pointing at the plugin's directory under `wp-content/plugins/` on
+  `shopping.flux.bg`). Excludes `tests/`, `.github/`, `phpunit.*`. The previous
+  SSH/rsync setup was replaced (2026-06-13) — `SSH_HOST` was unresolvable from
+  GitHub Actions runners and the secrets were never validated as live. The
+  `SSH_*` secrets are now unused and can be removed from the repo.
 - **`staging` → staging server**, via FTP (secrets: `STAGING_FTP_HOST/USER/PASSWORD/PATH`).
 - **PHPUnit tests** (`plugin/tests/`) run **without WordPress** — `wp-stubs.php`
   fakes the WP functions. This is the fast, no-deploy way to verify plugin logic.

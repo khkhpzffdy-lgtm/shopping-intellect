@@ -9,3 +9,5 @@ shopping-intellect/.ftp.env
 app/node_modules/
 app/dist/
 app/*.tsbuildinfo
+app/live-dist/
+app/root-live/

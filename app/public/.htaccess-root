@@ -1,0 +1,22 @@
+AddHandler ${application/x-httpd-propmbgp-php85} .php .php5 .phtml .php7 .php8
+
+<FilesMatch "xmlrpc\.php$">
+order deny,allow
+deny from all
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+# Keep the REST API on WordPress even though the app owns the root UI.
+RewriteRule ^wp-json(/.*)?$ /index.php [L,QSA]
+
+# Let real files and directories resolve normally first.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Everything else belongs to the SPA shell.
+RewriteRule ^ /index.html [L]
+</IfModule>

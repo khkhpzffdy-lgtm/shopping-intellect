@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/auth';
 import type {
   AuthEnvelope,
   CredentialsPayload,
+  GooglePayload,
   RegisterPayload,
   SessionEnvelope
 } from '../types/auth';
@@ -71,6 +72,9 @@ export const login = (payload: CredentialsPayload) =>
 
 export const register = (payload: RegisterPayload) =>
   apiRequest<SessionEnvelope>('/auth/register', { method: 'POST', body: payload });
+
+export const loginWithGoogle = (payload: GooglePayload) =>
+  apiRequest<SessionEnvelope>('/auth/google', { method: 'POST', body: payload });
 
 export const logout = () =>
   apiRequest<void>('/auth/logout', { method: 'POST', authenticated: true });

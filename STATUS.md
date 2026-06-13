@@ -113,9 +113,25 @@ wp-admin before real Google logins work: `si_google_client_id` and
 OAuth credentials, the token exchange will fail and the endpoint returns
 `401 google_verification_failed` (expected/safe default).
 
-**Next up:** §1.5 (frontend "Sign in with Google" button / OAuth redirect flow)
-— check `13-implementation-line.md` for the spec before starting. Cross-check
-against the files above so you don't re-build something that already exists.
+**§1.5 (frontend Google button) — done:** `AuthScreen` shows a "Вход с Google"
+button below the email/password form when `VITE_GOOGLE_CLIENT_ID` is set
+(`app/src/api/session.ts` `googleAuthUrl()`); it redirects to Google's OAuth
+consent screen with `redirect_uri` = the app's own origin+path. On return,
+`App.tsx` boot picks up `?code=...`, strips it from the URL, and calls
+`POST /auth/google` (`api/client.ts` `loginWithGoogle`), landing on the same
+session flow as email/password. **Needs a `VITE_GOOGLE_CLIENT_ID` build env var** — without it the button is
+hidden. Wired into `.github/workflows/deploy.yml` as
+`secrets.VITE_GOOGLE_CLIENT_ID`; **the Owner must add a `VITE_GOOGLE_CLIENT_ID`
+repo secret** (GitHub → repo → Settings → Secrets and variables → Actions) with
+the Google OAuth client ID, and add it to `app/.env.local` for local dev. The
+Google client ID's "Authorized redirect URIs" in Google Cloud Console must
+include the app's origin (e.g. `https://app.<domain>/`), matching what
+`googleRedirectUri()` sends.
+
+**Next up:** whatever the next unstarted M1/M2 slice is in
+`13-implementation-line.md` (M1 closes after §1.5; M2 starts at §2.1) — check
+there for the spec before starting. Cross-check against the files above so you
+don't re-build something that already exists.
 
 ---
 

@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { refreshSession, scheduleSilentRefresh } from './api/session';
+import { loginWithGoogle } from './api/client';
+import {
+  applyAuthEnvelope,
+  googleRedirectUri,
+  normalizeSessionUser,
+  refreshSession,
+  scheduleSilentRefresh
+} from './api/session';
 import { useAuthStore } from './store/auth';
 import { useThemeStore } from './store/theme';
 import { AuthScreen } from './components/AuthScreen';
@@ -18,6 +25,33 @@ export default function App() {
     let active = true;
 
     const boot = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+
+      if (code) {
+        params.delete('code');
+        params.delete('scope');
+        params.delete('state');
+        const query = params.toString();
+        window.history.replaceState(
+          {},
+          '',
+          window.location.pathname + (query ? `?${query}` : '')
+        );
+
+        try {
+          const response = await loginWithGoogle({ code, redirect_uri: googleRedirectUri() });
+          applyAuthEnvelope(response, normalizeSessionUser(response));
+          scheduleSilentRefresh(Date.now() + response.auth.expires_in * 1000);
+          if (active) {
+            setBootStatus('ready');
+          }
+          return;
+        } catch {
+          useAuthStore.getState().clearSession();
+        }
+      }
+
       try {
         await refreshSession();
       } catch {

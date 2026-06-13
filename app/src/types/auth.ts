@@ -33,3 +33,8 @@ export type CredentialsPayload = {
 export type RegisterPayload = CredentialsPayload & {
   display_name: string;
 };
+
+export type GooglePayload = {
+  code: string;
+  redirect_uri: string;
+};

@@ -96,6 +96,27 @@ export const refreshSession = async (): Promise<AuthEnvelope> => {
   }
 };
 
+export const googleRedirectUri = () => `${window.location.origin}${window.location.pathname}`;
+
+export const googleAuthUrl = (): string | null => {
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+  if (!clientId) {
+    return null;
+  }
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: googleRedirectUri(),
+    response_type: 'code',
+    scope: 'openid email profile',
+    access_type: 'online',
+    prompt: 'select_account'
+  });
+
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+};
+
 type FetchAuthInit = RequestInit & {
   body?: string;
 };

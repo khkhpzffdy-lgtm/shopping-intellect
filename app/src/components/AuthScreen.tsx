@@ -1,7 +1,12 @@
 import { FormEvent, useState } from 'react';
 import { ApiError } from '../api/session';
 import { login, register } from '../api/client';
-import { applyAuthEnvelope, normalizeSessionUser, scheduleSilentRefresh } from '../api/session';
+import {
+  applyAuthEnvelope,
+  googleAuthUrl,
+  normalizeSessionUser,
+  scheduleSilentRefresh
+} from '../api/session';
 
 type Mode = 'login' | 'register';
 
@@ -14,6 +19,13 @@ export const AuthScreen = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const submitLabel = mode === 'login' ? 'Вход' : 'Регистрация';
+  const googleUrl = googleAuthUrl();
+
+  const handleGoogleClick = () => {
+    if (googleUrl) {
+      window.location.assign(googleUrl);
+    }
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -150,6 +162,33 @@ export const AuthScreen = () => {
             {isSubmitting ? 'Моля, изчакайте...' : submitLabel}
           </button>
         </form>
+
+        {googleUrl ? (
+          <>
+            <div className="my-4 flex items-center gap-3">
+              <span className="h-px flex-1" style={{ background: 'var(--line)' }} />
+              <span style={{ color: 'var(--ink-2)', fontSize: 'var(--fs-sm)' }}>или</span>
+              <span className="h-px flex-1" style={{ background: 'var(--line)' }} />
+            </div>
+
+            <button
+              type="button"
+              aria-label="Sign in with Google"
+              onClick={handleGoogleClick}
+              className="w-full px-4 py-3 transition"
+              style={{
+                borderRadius: 'var(--radius-sm)',
+                background: 'var(--card-2)',
+                color: 'var(--ink)',
+                fontSize: 'var(--fs-sm)',
+                fontWeight: 600,
+                border: '1px solid var(--card-border)'
+              }}
+            >
+              Вход с Google
+            </button>
+          </>
+        ) : null}
       </div>
     </main>
   );

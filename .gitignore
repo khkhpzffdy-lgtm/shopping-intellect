@@ -3,3 +3,9 @@
 
 # Plugin code lives in its own repo (nested git)
 plugin/
+
+# Local deploy secrets
+shopping-intellect/.ftp.env
+app/node_modules/
+app/dist/
+app/*.tsbuildinfo

@@ -86,4 +86,5 @@ export const logout = () =>
 export const fetchProtected = <T>(path: string, options?: Omit<RequestOptions, 'authenticated'>) =>
   apiRequest<T>(path, { ...options, authenticated: true });
 
+export { ApiError };
 export type { AuthEnvelope, SessionEnvelope };

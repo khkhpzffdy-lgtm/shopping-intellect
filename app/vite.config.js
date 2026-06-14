@@ -31,7 +31,8 @@ export default defineConfig({
                 ]
             },
             workbox: {
-                globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}']
+                globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
+                navigateFallbackDenylist: [/^\/wp-admin/, /^\/wp-json/, /^\/wp-login\.php/, /^\/xmlrpc\.php/]
             }
         })
     ],

@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { afterAll, beforeEach, expect, test, vi } from 'vitest';
 import App from '../App';
 import { apiRequest } from '../api/client';
+import { clearScheduledRefresh } from '../api/session';
+import { clearDatabase } from '../storage/db';
 import { useAuthStore } from '../store/auth';
 
 const baseUrl = 'https://www.example.com/wp-json/si/v1';
@@ -29,17 +31,21 @@ const makeToken = (payload: Record<string, unknown>) => {
   return `header.${base64}.signature`;
 };
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.stubEnv('VITE_API_BASE_URL', baseUrl);
 
   vi.stubGlobal('fetch', mockFetch);
   mockFetch.mockReset();
   localStorage.clear();
   sessionStorage.clear();
+  clearScheduledRefresh();
   useAuthStore.getState().clearSession();
+  Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
+  await clearDatabase();
 });
 
 afterAll(() => {
+  clearScheduledRefresh();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
@@ -72,7 +78,7 @@ test('defaults to the dark theme with no stored preference', async () => {
   expect(container.querySelector('.si-root')).toHaveAttribute('data-theme', 'dark');
 });
 
-test('boot 200 shows home and keeps token out of storage', async () => {
+test('boot 200 shows lists overview and keeps token out of storage', async () => {
   const accessToken = makeToken({ user_id: 42, family_ids: [7], display_name: 'Dora' });
   const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
 
@@ -92,7 +98,7 @@ test('boot 200 shows home and keeps token out of storage', async () => {
   expect(setItemSpy).not.toHaveBeenCalled();
 });
 
-test('login success shows home and invalid credentials stay on auth', async () => {
+test('login success shows lists overview and invalid credentials stay on auth', async () => {
   mockFetch
     .mockResolvedValueOnce(
       new Response(JSON.stringify({ code: 'token_invalid' }), {
@@ -167,6 +173,128 @@ test('register success shows home', async () => {
   await userEvent.click(screen.getByRole('button', { name: 'Submit registration' }));
 
   expect(await screen.findByText('No lists yet')).toBeInTheDocument();
+});
+
+test('creating a list shows it immediately and persists across remount', async () => {
+  useAuthStore.getState().setSession({
+    accessToken: makeToken({ user_id: 2, family_ids: [], display_name: 'Mila' }),
+    expiresIn: 900,
+    user: { id: 2, displayName: 'Mila', familyIds: [] }
+  });
+
+  Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+
+  mockFetch.mockImplementation(() =>
+    Promise.resolve(
+      new Response(JSON.stringify({ auth: { access_token: makeToken({ user_id: 2, family_ids: [], display_name: 'Mila' }), expires_in: 900 } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    )
+  );
+
+  const view = renderApp();
+
+  await screen.findByText('No lists yet');
+  await userEvent.type(screen.getByLabelText('List name'), 'Weekly groceries');
+  await userEvent.click(screen.getByRole('button', { name: 'Create list' }));
+
+  expect(await screen.findByRole('button', { name: /Weekly groceries/i })).toBeInTheDocument();
+
+  view.unmount();
+  renderApp();
+
+  expect(await screen.findByRole('button', { name: /Weekly groceries/i })).toBeInTheDocument();
+});
+
+test('adding, toggling, removing, and reloading items stays local-first', async () => {
+  useAuthStore.getState().setSession({
+    accessToken: makeToken({ user_id: 4, family_ids: [], display_name: 'Iva' }),
+    expiresIn: 900,
+    user: { id: 4, displayName: 'Iva', familyIds: [] }
+  });
+
+  Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+
+  mockFetch.mockImplementation(() =>
+    Promise.resolve(
+      new Response(JSON.stringify({ auth: { access_token: makeToken({ user_id: 4, family_ids: [], display_name: 'Iva' }), expires_in: 900 } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    )
+  );
+
+  const view = renderApp();
+
+  await screen.findByText('No lists yet');
+  await userEvent.type(screen.getByLabelText('List name'), 'Weekend');
+  await userEvent.click(screen.getByRole('button', { name: 'Create list' }));
+  await userEvent.click(await screen.findByRole('button', { name: /Weekend/i }));
+
+  await userEvent.type(screen.getByLabelText('Item term'), 'мляко');
+  await userEvent.type(screen.getByLabelText('Item quantity'), '2');
+  await userEvent.type(screen.getByLabelText('Item unit'), 'piece');
+  await userEvent.click(screen.getByRole('button', { name: 'Add item' }));
+
+  expect(await screen.findByText('мляко')).toBeInTheDocument();
+  expect(screen.getByText('2 piece')).toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole('button', { name: 'shopping' }));
+  const checklistRow = await screen.findByRole('button', { name: /мляко/i });
+  expect(checklistRow).toHaveAttribute('aria-pressed', 'false');
+
+  await userEvent.click(checklistRow);
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: /мляко/i })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  view.unmount();
+  renderApp();
+
+  await screen.findByRole('button', { name: /Weekend/i });
+  await userEvent.click(screen.getByRole('button', { name: /Weekend/i }));
+  expect(await screen.findByText('мляко')).toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole('button', { name: 'shopping' }));
+  expect(await screen.findByRole('button', { name: /мляко/i })).toHaveAttribute('aria-pressed', 'true');
+  await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+  await waitFor(() => {
+    expect(screen.queryByText('мляко')).not.toBeInTheDocument();
+  });
+});
+
+test('mode toggle switches between planning and shopping rendering', async () => {
+  useAuthStore.getState().setSession({
+    accessToken: makeToken({ user_id: 8, family_ids: [], display_name: 'Niki' }),
+    expiresIn: 900,
+    user: { id: 8, displayName: 'Niki', familyIds: [] }
+  });
+
+  Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+
+  mockFetch.mockImplementation(() =>
+    Promise.resolve(
+      new Response(JSON.stringify({ auth: { access_token: makeToken({ user_id: 8, family_ids: [], display_name: 'Niki' }), expires_in: 900 } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    )
+  );
+
+  renderApp();
+
+  await screen.findByText('No lists yet');
+  await userEvent.type(screen.getByLabelText('List name'), 'Switch test');
+  await userEvent.click(screen.getByRole('button', { name: 'Create list' }));
+  await userEvent.click(await screen.findByRole('button', { name: /Switch test/i }));
+  await userEvent.type(screen.getByLabelText('Item term'), 'ябълки');
+  await userEvent.click(screen.getByRole('button', { name: 'Add item' }));
+
+  expect(await screen.findByText('Expand details soon')).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'shopping' }));
+  expect(screen.queryByText('Expand details soon')).not.toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: /ябълки/i })).toBeInTheDocument();
 });
 
 test('token_expired refreshes exactly once and retries once', async () => {

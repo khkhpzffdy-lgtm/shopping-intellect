@@ -10,20 +10,21 @@ export const SkeletonLoader = ({ shape = 'card' }: SkeletonLoaderProps) => {
   return (
     <div
       aria-label="Loading shell"
-      className="mx-auto max-w-5xl animate-pulse rounded-[2rem] border border-white/60 bg-white/70 p-6 shadow-shell"
+      className="mx-auto max-w-5xl animate-pulse p-6"
+      style={{ background: 'var(--card)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)' }}
     >
-      <div className="mb-6 h-5 w-32 rounded-full bg-sand" />
+      <div className="mb-6 h-5 w-32 rounded-full" style={{ background: 'var(--input)' }} />
       <div className="grid gap-4 md:grid-cols-[220px_1fr]">
-        <div className="space-y-3 rounded-[1.5rem] bg-canvas/80 p-4">
-          <div className="h-4 w-24 rounded-full bg-sand" />
-          <div className="h-4 w-20 rounded-full bg-sand" />
-          <div className="h-4 w-28 rounded-full bg-sand" />
+        <div className="space-y-3 p-4" style={{ background: 'var(--card-2)', borderRadius: 'var(--radius-sm)' }}>
+          <div className="h-4 w-24 rounded-full" style={{ background: 'var(--input)' }} />
+          <div className="h-4 w-20 rounded-full" style={{ background: 'var(--input)' }} />
+          <div className="h-4 w-28 rounded-full" style={{ background: 'var(--input)' }} />
         </div>
-        <div className="rounded-[1.5rem] bg-canvas/80 p-6">
-          <div className="mb-4 h-8 w-56 rounded-full bg-sand" />
-          <div className="h-4 w-full rounded-full bg-sand" />
-          <div className="mt-3 h-4 w-5/6 rounded-full bg-sand" />
-          <div className="mt-8 h-12 w-40 rounded-2xl bg-sand" />
+        <div className="p-6" style={{ background: 'var(--card-2)', borderRadius: 'var(--radius-sm)' }}>
+          <div className="mb-4 h-8 w-56 rounded-full" style={{ background: 'var(--input)' }} />
+          <div className="h-4 w-full rounded-full" style={{ background: 'var(--input)' }} />
+          <div className="mt-3 h-4 w-5/6 rounded-full" style={{ background: 'var(--input)' }} />
+          <div className="mt-8 h-12 w-40 rounded-2xl" style={{ background: 'var(--input)' }} />
         </div>
       </div>
     </div>

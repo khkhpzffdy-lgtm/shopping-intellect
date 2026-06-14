@@ -33,6 +33,31 @@ There is no submodule wiring; it's just two independent checkouts sharing a fold
 
 Both repos are on branch `main` only, except plugin also has `staging` (see below).
 
+**2026-06-14: merged plugin `staging` → `main` and pushed** (commit `65d79c2`,
+"Implement list REST endpoints"). This had been sitting on `staging` only —
+production (`shopping.flux.bg`) was missing `/lists` endpoints and the
+`AddListClientUuidMigration`, which is why "Create list" failed in the app with
+"Could not create the list on this device yet." After this deploy, verify the
+migration ran via the plugin's admin schema-status page before relying on
+list creation in production. **Going forward: when a Slice's backend half
+lands, push it to `main` (not just `staging`) once verified, or explicitly flag
+in this file that prod is behind staging — don't let them silently diverge.**
+
+**IMPORTANT — FTP deploy does NOT run migrations.** `Migrator::run()` only
+fires from `Plugin::activate()`, which only fires on plugin
+activation — not on file deploy. After any deploy that adds a migration
+(check `MigrationRegistry::defaultMigrations()` for new entries vs. what's
+already applied), the Owner must go to **wp-admin → Plugins → Deactivate →
+Activate** on Shopping Intellect to run pending migrations, then confirm via
+**Tools → SI Schema Status** that `schema_version` matches the latest
+migration id. Also note: `Plugin.php`'s REST bootstrap wraps controller/service
+construction in a try/catch that silently skips registering the *entire*
+`si/v1` namespace (including `/auth/refresh`) on any `\Throwable` — so a
+missing-column DB error during `/lists` POST can make `/auth/refresh` 404 too,
+which the frontend's `apiRequest` then treats as session-invalid and logs the
+user out. This silent catch is a standing risk worth tightening (e.g. log to
+a visible admin notice) in a future slice.
+
 ---
 
 ## 2. Where code runs — no local dev environment exists
@@ -92,6 +117,7 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 | §2.2a | Lists & `list_items` REST endpoints (backend half of §2.2) | ✅ done |
 | §2.2b | Two-mode list screen frontend | ✅ done |
 | §2.2 | Lists end-to-end (backend + frontend) | ✅ done |
+| §2.2c | Visual redesign of Lists overview + List screen to match `design/screens2.jsx` | ✅ done |
 
 **App (`app/`):** Vite + React PWA, FTP deploy wired. Implemented so far:
 - `AuthScreen` — register/login screen, working against the plugin's auth endpoints
@@ -108,6 +134,15 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
   `--radius`, `--fs-*`) instead of ad-hoc Tailwind colors. `HomeScreen` has a
   Светла/Тъмна theme toggle wired to `store/theme.ts`'s `setTheme`. A dedicated
   Профил screen is still a future slice.
+- **§2.2c visual redesign (done):** `ListsScreen` and `ListScreen` now follow
+  `design/screens2.jsx`'s `ListScreen` layout — app bar, "+"-reveal add bar,
+  segmented mode control (`planning`/`shopping`, capitalized via CSS to keep test
+  selectors stable), emoji-row items in planning mode, large-checkbox rows in
+  shopping mode. Classes ported from `design/app.css` into
+  `app/src/list-screens.css` (imported in `main.tsx`), scoped under `.si-root` to
+  avoid collisions with existing Tailwind/theme classes. FAB and bottom tab bar
+  omitted (no backing screens yet, per slice scope). All §2.2b data wiring,
+  IndexedDB/mutation-queue logic, and props/handlers are unchanged.
 
 This list is **not guaranteed complete or current** — if it looks stale, check
 `app/src/components/` and `app/src/App.tsx` directly rather than trusting this.
@@ -158,7 +193,10 @@ soft-deleted matches, and generates `client_uuid` values with the shared UUIDv4
 helper used by auth refresh lineage IDs.
 
 **Next up: §2.3 — Offline mutation flush / retry engine**
-(the durable reconnect sync pass that drains `mutation_queue`).
+(the durable reconnect sync pass that drains `mutation_queue`). §2.2c (visual
+redesign of Lists overview + List screen, see
+`slices/13-2.2c-list-screens-visual-redesign.md`) is done — Owner verification
+on shopping.flux.bg against that slice's acceptance criteria is still pending.
 
 ---
 

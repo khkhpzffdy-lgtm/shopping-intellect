@@ -1,0 +1,103 @@
+/* Ported from design/app.css for the §2.2c Lists overview + List screen restyle */
+
+.si-root .appbar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 4px 6px;
+}
+.si-root .appbar__title { font-size: var(--fs-title); font-weight: 700; letter-spacing: -0.3px; flex: 1; }
+.si-root .appbar__title b { color: var(--accent); font-weight: 700; }
+.si-root .iconbtn {
+  display: flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: 12px;
+  background: transparent; border: none; cursor: pointer;
+  color: var(--ink); flex-shrink: 0; font-size: var(--fs-h2);
+}
+.si-root .iconbtn:active { background: var(--input); }
+
+.si-root .modeseg { display: inline-flex; padding: 3px; gap: 2px; background: var(--input); border-radius: 999px; }
+.si-root .modeseg__opt {
+  display: flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 16px; border-radius: 999px;
+  font-size: var(--fs-sm); font-weight: 600; color: var(--ink-2);
+  border: none; background: transparent; cursor: pointer;
+  text-transform: capitalize;
+}
+.si-root .modeseg__opt[data-on="true"] { background: var(--accent); color: var(--on-accent); }
+
+.si-root .addbar {
+  display: flex; align-items: center; gap: 12px;
+  margin: 12px 0; padding: 7px 14px 7px 7px;
+  background: var(--input); border-radius: 999px;
+}
+.si-root .addbar__plus {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--accent); color: var(--on-accent);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; border: none; cursor: pointer;
+  font-size: 20px; line-height: 1;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.si-root .addbar__field {
+  flex: 1; border: none; background: transparent; outline: none;
+  color: var(--ink); font-size: var(--fs-body); min-width: 0;
+}
+.si-root .addbar__field::placeholder { color: var(--placeholder); }
+.si-root .addbar__mic { color: var(--ink-2); display: flex; flex-shrink: 0; }
+
+.si-root .glist { display: flex; flex-direction: column; padding: 0; }
+.si-root .git {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 8px; min-height: 56px;
+  position: relative; border-radius: 14px;
+  background: var(--card); border: 1px solid var(--card-border);
+  text-align: left; width: 100%; cursor: default;
+}
+.si-root .git--shop { min-height: 64px; gap: 16px; padding: 13px 12px; cursor: pointer; }
+.si-root .git--shop .git__name { font-size: var(--fs-h2); }
+.si-root .git--done { background: var(--accent-tint); }
+.si-root .git--done .git__name { color: var(--ink-3); text-decoration: line-through; text-decoration-color: var(--line-2); }
+.si-root .git--done .git__emoji { filter: grayscale(0.7); opacity: .5; }
+
+.si-root .git__emoji { font-size: 25px; line-height: 1; width: 30px; text-align: center; flex-shrink: 0; }
+.si-root .git__main { flex: 1; min-width: 0; }
+.si-root .git__name { font-size: var(--fs-title); font-weight: 600; letter-spacing: -0.2px; color: var(--ink); display: flex; align-items: center; gap: 8px; }
+.si-root .git__sub { font-size: var(--fs-body); color: var(--ink-2); margin-top: 3px; }
+.si-root .git__qty { font-size: var(--fs-body); font-weight: 500; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
+.si-root .git__fav { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: transparent; border: none; cursor: pointer; flex-shrink: 0; font-size: 18px; color: var(--ink-2); }
+.si-root .git__fav[aria-pressed="true"] { color: var(--accent); }
+
+.si-root .checkbox {
+  width: 28px; height: 28px; border-radius: 9px; flex-shrink: 0;
+  border: 2px solid var(--line-2); background: transparent;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--on-accent); font-size: var(--fs-sm); font-weight: 700;
+  transition: background .12s, border-color .12s;
+}
+.si-root .git--done .checkbox { background: var(--accent); border-color: var(--accent); }
+
+.si-root .brandchip {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 22px; padding: 0 9px; border-radius: 999px;
+  font-size: var(--fs-xs); font-weight: 600;
+  color: var(--chip-text); background: var(--chip-bg);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  white-space: nowrap;
+}
+
+/* ---- Lists overview ---- */
+.si-root .listcard {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; text-align: left; padding: 16px;
+  background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
+  cursor: pointer;
+}
+.si-root .listcard__name { font-size: var(--fs-h1); font-weight: 600; color: var(--ink); }
+.si-root .listcard__meta { margin-top: 6px; font-size: var(--fs-body); color: var(--ink-2); }
+.si-root .listcard__badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 26px; padding: 0 10px; border-radius: 999px;
+  font-size: var(--fs-xs); font-weight: 600;
+  background: var(--chip-bg); color: var(--chip-text); flex-shrink: 0;
+}
+.si-root .sync__dot { width: 7px; height: 7px; border-radius: 50%; background: #2FA968; display: inline-block; }
+.si-root .sync__dot--pending { background: var(--promo); }

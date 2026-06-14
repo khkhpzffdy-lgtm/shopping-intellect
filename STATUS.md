@@ -89,7 +89,8 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 | §1.4b | Google OAuth login (`POST /auth/google`) | ✅ done |
 | §1.5 | App shell + auth screen + silent-refresh boot (email/password + Google) | ✅ done — M1 closed |
 | §2.1 | UserProduct create-on-write + owner-scoped term normalization | ✅ done |
-| §2.2+ | Everything after §2.1 (M2 — Lists, terms & families) | ❌ not started |
+| §2.2a | Lists & `list_items` REST endpoints (backend half of §2.2) | ✅ done |
+| §2.2b | Two-mode list screen frontend | ❌ not started |
 
 **App (`app/`):** Vite + React PWA, FTP deploy wired. Implemented so far:
 - `AuthScreen` — register/login screen, working against the plugin's auth endpoints
@@ -155,8 +156,8 @@ The service dedupes on `(owner_type, owner_id, normalized_term)`, un-archives
 soft-deleted matches, and generates `client_uuid` values with the shared UUIDv4
 helper used by auth refresh lineage IDs.
 
-**Next up: §2.2 — Two-mode list (build/shop) with offline optimistic queue**
-(`13-implementation-line.md` line ~138).
+**Next up: §2.2b — Two-mode list screen frontend**
+(`slices/13-2.2b-list-screen-frontend.md`).
 
 ---
 

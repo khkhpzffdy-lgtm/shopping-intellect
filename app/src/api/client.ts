@@ -59,7 +59,11 @@ export const apiRequest = async <T>(
       });
     }
 
-    if (error instanceof ApiError && error.status === 401) {
+    if (
+      error instanceof ApiError &&
+      error.status === 401 &&
+      (error.code === 'token_invalid' || error.code === 'token_reuse_detected')
+    ) {
       useAuthStore.getState().clearSession();
     }
 

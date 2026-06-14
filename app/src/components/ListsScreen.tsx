@@ -10,6 +10,9 @@ type ListsScreenProps = {
   onCreateNameChange: (value: string) => void;
   onCreateList: () => void;
   onOpenList: (listKey: string) => void;
+  theme: 'light' | 'dark';
+  onSetTheme: (theme: 'light' | 'dark') => void;
+  onLogout: () => void;
 };
 
 const SyncStatusIndicator = ({ pendingCount }: { pendingCount: number }) => (
@@ -27,7 +30,10 @@ export const ListsScreen = ({
   errorMessage,
   onCreateNameChange,
   onCreateList,
-  onOpenList
+  onOpenList,
+  theme,
+  onSetTheme,
+  onLogout
 }: ListsScreenProps) => {
   const [creating, setCreating] = useState(false);
 
@@ -42,6 +48,50 @@ export const ListsScreen = ({
         <div className="appbar__title">
           Shopping <b>Intellect</b>
         </div>
+        <div className="inline-flex p-1" style={{ background: 'var(--card-2)', borderRadius: 'var(--radius-sm)' }}>
+          <button
+            type="button"
+            aria-label="Светла тема"
+            onClick={() => onSetTheme('light')}
+            style={{
+              borderRadius: 'var(--radius-sm)',
+              fontSize: 'var(--fs-xs)',
+              padding: '6px 12px',
+              fontWeight: 600,
+              border: 'none',
+              cursor: 'pointer',
+              background: theme === 'light' ? 'var(--accent)' : 'transparent',
+              color: theme === 'light' ? 'var(--on-accent)' : 'var(--ink-2)'
+            }}
+          >
+            Светла
+          </button>
+          <button
+            type="button"
+            aria-label="Тъмна тема"
+            onClick={() => onSetTheme('dark')}
+            style={{
+              borderRadius: 'var(--radius-sm)',
+              fontSize: 'var(--fs-xs)',
+              padding: '6px 12px',
+              fontWeight: 600,
+              border: 'none',
+              cursor: 'pointer',
+              background: theme === 'dark' ? 'var(--accent)' : 'transparent',
+              color: theme === 'dark' ? 'var(--on-accent)' : 'var(--ink-2)'
+            }}
+          >
+            Тъмна
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={onLogout}
+          className="px-3 py-2 transition"
+          style={{ borderRadius: 'var(--radius-sm)', border: '1px solid var(--line)', color: 'var(--ink-2)', fontSize: 'var(--fs-xs)', fontWeight: 600, background: 'none', cursor: 'pointer' }}
+        >
+          Sign out
+        </button>
       </div>
 
       <div className="addbar">

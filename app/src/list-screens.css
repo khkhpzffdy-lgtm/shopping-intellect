@@ -3,6 +3,7 @@
 .si-root .appbar {
   display: flex; align-items: center; gap: 8px;
   padding: 8px 4px 6px;
+  flex-wrap: wrap;
 }
 .si-root .appbar__title { font-size: var(--fs-title); font-weight: 700; letter-spacing: -0.3px; flex: 1; }
 .si-root .appbar__title b { color: var(--accent); font-weight: 700; }

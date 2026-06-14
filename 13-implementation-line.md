@@ -142,6 +142,17 @@ their own terms, offline, and have it sync.*
 - **Iron:** `client_uuid` idempotent sync; offline-born `list_items` carry it (§2.6).
 - **Owner sees:** adds items with Wi-Fi **off**, sees them immediately; back online they persist after reload.
 
+### §2.2c — Visual redesign of Lists overview + List screen
+- **Goal:** restyle §2.2b's functional Lists overview + two-mode List screen to match the
+  canonical mobile UI in `design/screens2.jsx`/`design/app.css` (app bar, list switcher,
+  mode segmented control, emoji rows, `ListCard`), without changing data/sync logic.
+- **Dep:** §2.2b
+- **Canon:** `10 §8.1`/`§8.18`/`§8.19`/`§8.21`/`§8.26` (component states/variants) ·
+  `design/screens2.jsx` + `design/app.css` (canonical layout/classes).
+- **Iron:** no regression to §2.2b's optimistic local-first offline behaviour.
+- **Owner sees:** the app visually matches the `design/screens2.jsx` mockup for Lists
+  overview and the List screen; create/add/check/remove and offline behaviour unchanged.
+
 ### §2.3 — Sync engine (last-write-wins, no conflict UI)
 - **Goal:** the queued mutations flush to the server idempotently; server `updated_at` last-write-wins; the only recency signal is "updated X ago."
 - **Dep:** §2.2

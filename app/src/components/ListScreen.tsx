@@ -5,6 +5,7 @@ type ListScreenProps = {
   list: ShoppingListRecord;
   items: ListItemView[];
   pendingCounts: Record<string, number>;
+  errorMessage: string | null;
   draft: {
     term: string;
     quantity: string;
@@ -36,6 +37,7 @@ export const ListScreen = ({
   list,
   items,
   pendingCounts,
+  errorMessage,
   draft,
   onDraftChange,
   onBack,
@@ -124,6 +126,11 @@ export const ListScreen = ({
             Add item
           </button>
         </div>
+        {errorMessage ? (
+          <p className="mt-3" role="alert" style={{ color: 'var(--danger)', fontSize: 'var(--fs-sm)' }}>
+            {errorMessage}
+          </p>
+        ) : null}
       </div>
 
       <div className="grid gap-3">

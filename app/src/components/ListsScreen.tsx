@@ -5,6 +5,7 @@ type ListsScreenProps = {
   itemCounts: Record<string, number>;
   pendingCounts: Record<string, number>;
   createName: string;
+  errorMessage: string | null;
   onCreateNameChange: (value: string) => void;
   onCreateList: () => void;
   onOpenList: (listKey: string) => void;
@@ -30,6 +31,7 @@ export const ListsScreen = ({
   itemCounts,
   pendingCounts,
   createName,
+  errorMessage,
   onCreateNameChange,
   onCreateList,
   onOpenList
@@ -60,6 +62,11 @@ export const ListsScreen = ({
           Create list
         </button>
       </div>
+      {errorMessage ? (
+        <p className="mt-3" role="alert" style={{ color: 'var(--danger)', fontSize: 'var(--fs-sm)' }}>
+          {errorMessage}
+        </p>
+      ) : null}
     </div>
 
     {lists.length === 0 ? (

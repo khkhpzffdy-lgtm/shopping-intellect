@@ -1,4 +1,4 @@
-import { logout } from '../api/client';
+import { ApiError, logout } from '../api/client';
 import { clearScheduledRefresh } from '../api/session';
 import { useAuthStore } from '../store/auth';
 import { useThemeStore } from '../store/theme';
@@ -24,6 +24,18 @@ import { ListScreen } from './ListScreen';
 import { apiRequest } from '../api/client';
 import { useEffect, useMemo, useState } from 'react';
 import { generateUuid } from '../utils/uuid';
+
+const formatActionError = (error: unknown, fallback: string) => {
+  if (error instanceof ApiError) {
+    return error.code ? `${fallback} (${error.code})` : `${fallback} (${error.message})`;
+  }
+
+  if (error instanceof Error && error.message) {
+    return `${fallback} (${error.message})`;
+  }
+
+  return fallback;
+};
 
 export const HomeScreen = () => {
   const user = useAuthStore((state) => state.user);
@@ -134,8 +146,10 @@ export const HomeScreen = () => {
       await putList({ ...optimisticList, id: response.list?.id });
       await markMutationDone(clientUuid);
       await refreshLists();
-    } catch {
-      setErrorMessage('Could not create the list on this device yet. Please try again.');
+    } catch (error) {
+      setErrorMessage(
+        formatActionError(error, 'Could not create the list on this device yet. Please try again.')
+      );
     }
   };
 
@@ -229,8 +243,10 @@ export const HomeScreen = () => {
       });
       await markMutationDone(itemClientUuid);
       await refreshItems(selectedList.client_uuid);
-    } catch {
-      setErrorMessage('Could not add the item on this device yet. Please try again.');
+    } catch (error) {
+      setErrorMessage(
+        formatActionError(error, 'Could not add the item on this device yet. Please try again.')
+      );
     }
   };
 

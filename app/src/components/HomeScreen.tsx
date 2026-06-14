@@ -128,10 +128,6 @@ export const HomeScreen = () => {
       });
       await refreshLists();
 
-      if (!navigator.onLine) {
-        return;
-      }
-
       const response = await apiRequest<{ list?: { id?: string } }>('/lists', {
         method: 'POST',
         body: {
@@ -213,7 +209,7 @@ export const HomeScreen = () => {
       await refreshLists();
       await refreshItems(selectedList.client_uuid);
 
-      if (!navigator.onLine || !selectedList.id) {
+      if (!selectedList.id) {
         return;
       }
 
@@ -292,10 +288,6 @@ export const HomeScreen = () => {
     });
     await refreshItems(selectedList.client_uuid);
 
-    if (!navigator.onLine) {
-      return;
-    }
-
     try {
       await apiRequest(`/lists/${selectedList.id}/items/${item.id}`, {
         method: 'PATCH',
@@ -333,10 +325,6 @@ export const HomeScreen = () => {
       entity_client_uuid: item.client_uuid
     });
     await refreshItems(selectedList.client_uuid);
-
-    if (!navigator.onLine) {
-      return;
-    }
 
     try {
       await apiRequest(`/lists/${selectedList.id}/items/${item.id}`, {

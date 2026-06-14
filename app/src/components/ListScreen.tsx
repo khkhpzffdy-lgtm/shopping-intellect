@@ -125,7 +125,7 @@ export const ListScreen = ({
                 <p style={{ color: 'var(--ink-3)', fontSize: 'var(--fs-xs)', marginTop: '4px' }}>Expand details soon</p>
               </div>
               <SyncStatusIndicator pendingCount={pendingCounts[item.client_uuid] ?? 0} />
-              <button type="button" onClick={() => onRemoveItem(item)} style={{ color: 'var(--danger)', fontSize: 'var(--fs-sm)', fontWeight: 600 }}>
+              <button type="button" onClick={() => onRemoveItem(item)} className="git__remove">
                 Remove
               </button>
             </article>
@@ -154,7 +154,7 @@ export const ListScreen = ({
                 </span>
               </button>
               <SyncStatusIndicator pendingCount={pendingCounts[item.client_uuid] ?? 0} />
-              <button type="button" onClick={() => onRemoveItem(item)} style={{ color: 'var(--danger)', fontSize: 'var(--fs-sm)', fontWeight: 600 }}>
+              <button type="button" onClick={() => onRemoveItem(item)} className="git__remove">
                 Remove
               </button>
             </article>

@@ -9,3 +9,266 @@ body,
   min-width: 320px;
   min-height: 100vh;
 }
+
+body {
+  background: #0b0b0f;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.appbar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.appbar__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+  font-size: var(--fs-h1);
+  font-weight: 700;
+}
+
+.iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 32px;
+  cursor: pointer;
+}
+
+.modeseg {
+  display: inline-flex;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+}
+
+.modeseg__opt {
+  border: 0;
+  border-radius: 999px;
+  padding: 14px 26px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.modeseg__opt[data-on='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--fab-shadow);
+}
+
+.addbar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 18px;
+  border-radius: 28px;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+}
+
+.addbar__plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 42px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--fab-shadow);
+}
+
+.addbar__field {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--fs-h2);
+}
+
+.listcard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 18px 20px;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.listcard__name {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-h2);
+  font-weight: 700;
+}
+
+.listcard__meta {
+  margin: 6px 0 0;
+  color: var(--ink-2);
+  font-size: var(--fs-body);
+}
+
+.listcard__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--chip-text);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sync__dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--ink-3);
+  flex: 0 0 auto;
+}
+
+.sync__dot--pending {
+  background: #d39a12;
+}
+
+.glist {
+  display: grid;
+  gap: 16px;
+}
+
+.git {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  border-radius: 28px;
+  border: 1px solid var(--card-border);
+  background: var(--card);
+}
+
+.git--shop {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.git--done {
+  background: var(--accent-tint);
+}
+
+.git__emoji {
+  font-size: 34px;
+  line-height: 1;
+}
+
+.git__main {
+  min-width: 0;
+}
+
+.git__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+  font-size: var(--fs-h1);
+  font-weight: 700;
+}
+
+.git__sub,
+.git__qty {
+  color: var(--ink-2);
+  font-size: var(--fs-h2);
+}
+
+.git__qty {
+  white-space: nowrap;
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 2px solid var(--accent);
+  color: var(--on-accent);
+  background: transparent;
+  flex: 0 0 auto;
+}
+
+.git--done .checkbox {
+  background: var(--accent);
+}
+
+.git__remove {
+  border: 0;
+  background: transparent;
+  color: var(--danger);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .appbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .iconbtn {
+    width: 38px;
+    height: 38px;
+    font-size: 28px;
+  }
+
+  .addbar {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .git,
+  .git--shop {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .listcard,
+  .git {
+    padding: 16px;
+  }
+}

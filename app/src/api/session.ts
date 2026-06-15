@@ -128,7 +128,18 @@ const buildUrl = (path: string) => {
 
 const parseError = async (response: Response) => {
   try {
-    return (await response.json()) as { code?: string; message?: string };
+    const payload = (await response.json()) as {
+      code?: string;
+      message?: string;
+      details?: Record<string, string>;
+      error?: {
+        code?: string;
+        message?: string;
+        details?: Record<string, string>;
+      };
+    };
+
+    return payload.error ?? payload;
   } catch {
     return { message: response.statusText };
   }
@@ -136,13 +147,15 @@ const parseError = async (response: Response) => {
 
 export class ApiError extends Error {
   code?: string;
+  details?: Record<string, string>;
   status: number;
 
-  constructor(status: number, message: string, code?: string) {
+  constructor(status: number, message: string, code?: string, details?: Record<string, string>) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -158,7 +171,7 @@ export const fetchAuth = async <T>(path: string, init: FetchAuthInit): Promise<T
 
   if (!response.ok) {
     const error = await parseError(response);
-    throw new ApiError(response.status, error.message ?? 'Request failed', error.code);
+    throw new ApiError(response.status, error.message ?? 'Request failed', error.code, error.details);
   }
 
   if (response.status === 204) {

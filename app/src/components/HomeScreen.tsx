@@ -30,6 +30,16 @@ import { generateUuid } from '../utils/uuid';
 
 const formatActionError = (error: unknown, fallback: string) => {
   if (error instanceof ApiError) {
+    const detailMessage = error.details
+      ? Object.entries(error.details)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join(', ')
+      : null;
+
+    if (detailMessage) {
+      return `${fallback} (${detailMessage})`;
+    }
+
     return error.code ? `${fallback} (${error.code})` : `${fallback} (${error.message})`;
   }
 

@@ -118,6 +118,7 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 | §2.2b | Two-mode list screen frontend | ✅ done |
 | §2.2 | Lists end-to-end (backend + frontend) | ✅ done |
 | §2.2c | Visual redesign of Lists overview + List screen to match `design/screens2.jsx` | ✅ done |
+| §2.3 | Offline mutation flush/retry engine (durable reconnect sync, drains `mutation_queue`) | ✅ done |
 
 **App (`app/`):** Vite + React PWA, FTP deploy wired. Implemented so far:
 - `AuthScreen` — register/login screen, working against the plugin's auth endpoints
@@ -143,6 +144,25 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
   avoid collisions with existing Tailwind/theme classes. FAB and bottom tab bar
   omitted (no backing screens yet, per slice scope). All §2.2b data wiring,
   IndexedDB/mutation-queue logic, and props/handlers are unchanged.
+- **§2.3 offline mutation flush/retry engine (done):** `app/src/sync/flush.ts`
+  (`flushQueuedMutations`) drains `mutation_queue` rows with status `pending`/
+  `failed`, sorted by `created_at`, one at a time. Each mutation is atomically
+  claimed via `markMutationInFlight` (returns `null` if already claimed, so a
+  concurrent drain can't double-send), replayed via `apiRequest`, and on success
+  mapped back onto local records by the shared `app/src/sync/
+  applyMutationSuccess.ts` helper (now reused by both the inline optimistic
+  fast-path in `HomeScreen.tsx` and the drain engine — no duplicated
+  response-mapping). On failure, `markMutationFailed` increments `attempts` and
+  leaves it for the next drain. `HomeScreen` runs a drain on mount (boot) and on
+  the browser's `online` event, then refreshes lists/items/pending counts so
+  `SyncStatusIndicator` updates without a reload. `db.ts` gained
+  `getQueuedMutations`, `markMutationInFlight`, `markMutationFailed`,
+  `getUserProduct`, `getListItem`, `getMutation`, `touchListUpdatedAt` (no
+  `DB_VERSION` bump — no schema/keyPath change). `touchListUpdatedAt` also fixes
+  a stale-closure race where `handleAddItem`'s `putList({...selectedList, ...})`
+  could clobber a list's server `id` if the drain had just written it
+  concurrently. Tests in `app/src/test/flush.test.ts`. Pushed to `main`
+  (`be211c9`), CI build+deploy green.
 
 This list is **not guaranteed complete or current** — if it looks stale, check
 `app/src/components/` and `app/src/App.tsx` directly rather than trusting this.
@@ -192,18 +212,21 @@ The service dedupes on `(owner_type, owner_id, normalized_term)`, un-archives
 soft-deleted matches, and generates `client_uuid` values with the shared UUIDv4
 helper used by auth refresh lineage IDs.
 
-**Next up: §2.3 — Offline mutation flush / retry engine**
-(the durable reconnect sync pass that drains `mutation_queue`). §2.2c (visual
-redesign of Lists overview + List screen, see
-`slices/13-2.2c-list-screens-visual-redesign.md`) is done — Owner verification
-on shopping.flux.bg against that slice's acceptance criteria is still pending.
+**§2.3 (done):** offline mutation flush/retry engine — see "Implemented so far"
+above. Pushed to `main` (`be211c9`), CI build+deploy green. Owner verification on
+shopping.flux.bg of §2.3's reconnect-drain acceptance criteria (and the still-
+pending §2.2c criteria) is outstanding.
 
-**Build order changed 2026-06-15** (see `13-implementation-line.md` "Re-sequencing"
-note above M3): after §2.3, the order is §3.1→§3.3 (crawler/ingestion, backend-only)
-→ **§4.0 (new)** navigation shell + Add/Search screen → §4.1 → §4.2 → §2.4 (Family)
-→ §2.5 (Favorites) → §4.3 (Comparison) → M5. Family/Favorites were pushed later;
-navigation + a second real screen (Add/Search) now comes right after the crawler,
-not at the end of M4.
+**Next up: §3.1 — `HttpClient` interface + `WpHttpClient` + `AbstractCrawler`**
+(crawler base in the plugin repo: fetch via injected `HttpClient`, parse with
+built-in DOM/XPath, emit `RawOffer` DTOs — backend-only, no app/screen changes).
+
+**Build order (2026-06-15 re-sequencing, see `13-implementation-line.md`
+"Re-sequencing" note above M3):** §2.3 (done) → **§3.1 (next)** → §3.2 → §3.3
+(crawler/ingestion, backend-only) → **§4.0 (new)** navigation shell + Add/Search
+screen → §4.1 → §4.2 → §2.4 (Family) → §2.5 (Favorites) → §4.3 (Comparison) → M5.
+Family/Favorites were pushed later; navigation + a second real screen (Add/Search)
+comes right after the crawler, not at the end of M4.
 
 ---
 

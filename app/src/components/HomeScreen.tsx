@@ -1,5 +1,7 @@
 import { ApiError, logout } from '../api/client';
 import { clearScheduledRefresh } from '../api/session';
+import { applyMutationSuccess } from '../sync/applyMutationSuccess';
+import { flushQueuedMutations } from '../sync/flush';
 import { useAuthStore } from '../store/auth';
 import { useThemeStore } from '../store/theme';
 import {
@@ -22,7 +24,7 @@ import {
 import { ListsScreen } from './ListsScreen';
 import { ListScreen } from './ListScreen';
 import { apiRequest } from '../api/client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { generateUuid } from '../utils/uuid';
 
 const formatActionError = (error: unknown, fallback: string) => {
@@ -49,6 +51,9 @@ export const HomeScreen = () => {
   const [createName, setCreateName] = useState('');
   const [draft, setDraft] = useState({ term: '', quantity: '', unit: '' });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const selectedListKeyRef = useRef<string | null>(null);
+
+  selectedListKeyRef.current = selectedListKey;
 
   const selectedList = useMemo(
     () => lists.find((list) => list.client_uuid === selectedListKey || list.id === selectedListKey) ?? null,
@@ -82,6 +87,43 @@ export const HomeScreen = () => {
 
     void refreshItems(selectedListKey);
   }, [selectedListKey]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    let isActive = true;
+
+    const runQueuedMutationDrain = async () => {
+      try {
+        await flushQueuedMutations();
+      } finally {
+        if (!isActive) {
+          return;
+        }
+
+        await refreshLists();
+        const listKey = selectedListKeyRef.current;
+        if (listKey) {
+          await refreshItems(listKey);
+        }
+      }
+    };
+
+    void runQueuedMutationDrain();
+
+    const handleOnline = () => {
+      void runQueuedMutationDrain();
+    };
+
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      isActive = false;
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [user]);
 
   const handleLogout = async () => {
     try {
@@ -139,7 +181,24 @@ export const HomeScreen = () => {
         authenticated: true
       });
 
-      await putList({ ...optimisticList, id: response.list?.id });
+      await applyMutationSuccess(
+        {
+          client_uuid: clientUuid,
+          endpoint: '/lists',
+          method: 'POST',
+          body: {
+            name: optimisticList.name,
+            owner_type: 'user',
+            owner_id: user.id,
+            client_uuid: clientUuid
+          },
+          created_at: now,
+          attempts: 0,
+          status: 'pending',
+          entity_client_uuid: clientUuid
+        },
+        response
+      );
       await markMutationDone(clientUuid);
       await refreshLists();
     } catch (error) {
@@ -230,13 +289,27 @@ export const HomeScreen = () => {
         authenticated: true
       });
 
-      await putUserProduct({ ...product, id: response.user_product?.id });
-      await putListItem({
-        ...optimisticItem,
-        id: response.item?.id,
-        is_checked: response.item?.is_checked ?? optimisticItem.is_checked,
-        user_product_id: response.user_product?.id ?? optimisticItem.user_product_id
-      });
+      await applyMutationSuccess(
+        {
+          client_uuid: itemClientUuid,
+          endpoint: `/lists/${selectedList.id}/items`,
+          method: 'POST',
+          body: {
+            client_uuid: itemClientUuid,
+            quantity: optimisticItem.quantity,
+            unit: optimisticItem.unit,
+            user_product: {
+              client_uuid: product.client_uuid,
+              term: product.term
+            }
+          },
+          created_at: now,
+          attempts: 0,
+          status: 'pending',
+          entity_client_uuid: itemClientUuid
+        },
+        response
+      );
       await markMutationDone(itemClientUuid);
       await refreshItems(selectedList.client_uuid);
     } catch (error) {

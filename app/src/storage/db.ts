@@ -150,16 +150,38 @@ export const putUserProduct = async (userProduct: UserProductRecord) => {
   await db.put('user_products', userProduct);
 };
 
+export const getUserProduct = async (clientUuid: string) => {
+  const db = await getDb();
+  return db.get('user_products', clientUuid);
+};
+
 export const enqueueMutation = async (mutation: MutationQueueRecord) => {
   const db = await getDb();
   await db.put('mutation_queue', mutation);
+};
+
+export const getMutation = async (clientUuid: string) => {
+  const db = await getDb();
+  return db.get('mutation_queue', clientUuid);
+};
+
+export const getQueuedMutations = async (statuses: SyncStatus[] = ['pending', 'failed']) => {
+  const db = await getDb();
+  const queued = await db.getAll('mutation_queue');
+  return queued
+    .filter((mutation) => statuses.includes(mutation.status))
+    .sort((a, b) => a.created_at.localeCompare(b.created_at));
 };
 
 export const getPendingMutationCounts = async () => {
   const db = await getDb();
   const mutations = await db.getAll('mutation_queue');
   return mutations.reduce<Record<string, number>>((counts, mutation) => {
-    if (mutation.status === 'pending' || mutation.status === 'in_flight') {
+    if (
+      mutation.status === 'pending' ||
+      mutation.status === 'in_flight' ||
+      mutation.status === 'failed'
+    ) {
       counts[mutation.entity_client_uuid] = (counts[mutation.entity_client_uuid] ?? 0) + 1;
     }
     return counts;
@@ -169,6 +191,34 @@ export const getPendingMutationCounts = async () => {
 export const markMutationDone = async (clientUuid: string) => {
   const db = await getDb();
   await db.delete('mutation_queue', clientUuid);
+};
+
+export const markMutationInFlight = async (clientUuid: string) => {
+  const db = await getDb();
+  const mutation = await db.get('mutation_queue', clientUuid);
+  if (!mutation) {
+    return null;
+  }
+
+  const updatedMutation = { ...mutation, status: 'in_flight' as const };
+  await db.put('mutation_queue', updatedMutation);
+  return updatedMutation;
+};
+
+export const markMutationFailed = async (clientUuid: string) => {
+  const db = await getDb();
+  const mutation = await db.get('mutation_queue', clientUuid);
+  if (!mutation) {
+    return null;
+  }
+
+  const updatedMutation = {
+    ...mutation,
+    attempts: mutation.attempts + 1,
+    status: 'failed' as const
+  };
+  await db.put('mutation_queue', updatedMutation);
+  return updatedMutation;
 };
 
 export const updateMutationBody = async (clientUuid: string, body: unknown) => {
@@ -192,4 +242,9 @@ export const removeQueuedMutationsForEntity = async (entityClientUuid: string) =
 
 export const clearDatabase = async () => {
   await deleteDB(DB_NAME);
+};
+
+export const getListItem = async (clientUuid: string) => {
+  const db = await getDb();
+  return db.get('list_items', clientUuid);
 };

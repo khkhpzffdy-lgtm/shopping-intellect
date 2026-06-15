@@ -170,11 +170,11 @@ describe('flushQueuedMutations', () => {
       entity_client_uuid: 'list-local-3'
     });
 
-    let resolveRequest: ((value: { list: { id: string } }) => void) | null = null;
+    const deferred: { resolve?: (value: { list: { id: string } }) => void } = {};
     mockedApiRequest.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
-          resolveRequest = resolve;
+          deferred.resolve = resolve;
         })
     );
 
@@ -187,7 +187,7 @@ describe('flushQueuedMutations', () => {
       status: 'in_flight'
     });
 
-    resolveRequest?.({ list: { id: 'srv-list-3' } });
+    deferred.resolve?.({ list: { id: 'srv-list-3' } });
     await Promise.all([firstDrain, secondDrain]);
 
     expect(mockedApiRequest).toHaveBeenCalledTimes(1);

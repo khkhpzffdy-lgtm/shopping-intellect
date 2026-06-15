@@ -93,6 +93,15 @@ export const putList = async (list: ShoppingListRecord) => {
   await db.put('lists', list);
 };
 
+export const touchListUpdatedAt = async (clientUuid: string, updatedAt: string) => {
+  const db = await getDb();
+  const current = await db.get('lists', clientUuid);
+  if (!current) {
+    return;
+  }
+  await db.put('lists', { ...current, updated_at: updatedAt });
+};
+
 export const getListItems = async (listKey: string): Promise<ListItemView[]> => {
   const db = await getDb();
   const items = await db.getAll('list_items');

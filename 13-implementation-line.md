@@ -166,6 +166,8 @@ their own terms, offline, and have it sync.*
 - **Canon:** `06 §6` (family endpoints; note `DELETE /families/{id}` is still open — D §14) · `10 §4` · `11 Flow 7`–`Flow 9` · `decisions.md` D-2 (membership lifecycle) · `04` family tables.
 - **Iron:** owner = family if family-owned else individual (§3); `family_ids[]` in the JWT claim set (§5).
 - **Owner sees:** invites a second account by email; that account accepts via the link and sees the shared list.
+- **Build order note (2026-06-15):** moved later in the *build sequence* — see "Re-sequencing"
+  below. Dependency stays §2.3; only the order it's tackled in changed.
 
 ### §2.5 — Owner-scoped favorites / recent / frequent quick-add
 - **Goal:** `is_favorite` on UserProduct; recently/frequently-bought derived from `purchase_log`, scoped to the **list's owner** (family vs user).
@@ -173,6 +175,40 @@ their own terms, offline, and have it sync.*
 - **Canon:** `10 §4.2`/`§6` (owner-context, no global catalog picker, no history screen) · `04 §7.3`/`§7.5` (purchase_log shape; frequent = ≥3 in rolling 8wk) · `decisions.md` §14.
 - **Iron:** demand-first, search only owner's own terms — no global product picker (`10`, D §14); soft-delete via `is_archived` (D §14).
 - **Owner sees:** stars a term; it surfaces in quick-add for that owner; a different owner's list doesn't show it.
+- **Build order note (2026-06-15):** moved later in the *build sequence* — see "Re-sequencing"
+  below. Dependency stays §2.4; only the order it's tackled in changed.
+
+-----
+
+## Re-sequencing (2026-06-15) — build order vs. dependency order
+
+The numbering above (§2.4/§2.5 before M3/M4) reflects **dependency order** and stays as the
+canonical reference for *what depends on what*. The actual **build order** the Owner asked for
+diverges from it, because two screens (Lists overview, List screen) for months felt too thin and
+Family/Favorites aren't the most valuable next payoff. Build in this order instead:
+
+```
+§2.3 (done) → §3.1 → §3.2 → §3.3 → §4.1 + nav-and-AddSearch → §4.2 → §2.4 → §2.5 → §4.3 → M5
+```
+
+- **§3.1–§3.3 (crawl/ingestion)** next — backend-only, depends only on M0, no screen changes.
+  Real offers landing in the DB unblocks §4.1 immediately after.
+- **§4.1 + a new navigation/Add-Search slice** — introduces the app's **second real screen**
+  (Add/Search, `11` B.5) plus the tab-bar/menu navigation shell (`11` B.10 omitted scope from
+  §2.2c). This is the first slice after §2.3 that changes what the Owner sees day-to-day,
+  rather than waiting until M4 as originally laid out.
+- **§4.2 (match-by-selection + brand anchor)** follows directly — same screens (Add/Search,
+  Product Detail), no new dependencies.
+- **§2.4 (Family) then §2.5 (Favorites)** — moved here. Dependency-wise §2.4 only needs §2.3
+  and §2.5 only needs §2.4, both of which are satisfied well before this point; nothing in
+  §3.x/§4.1/§4.2 depends on Family or Favorites, so this reorder is dependency-safe.
+- **§4.3 (Comparison)** last in M2–M4 — its declared dep on §2.5 (favorites/frequent) is now
+  satisfied by the time we reach it.
+- **M5** unchanged at the end.
+
+If a future session re-derives the build order from this file without reading this note, the
+numeric §2.x/§3.x/§4.x ordering above is **dependency order, not build order** — check this
+section first.
 
 -----
 
@@ -210,9 +246,27 @@ trigger a crawl from the Admin/CLI and watch real offers land, bucketed.*
 *The product's reason to exist. Closes when the Owner opens a term, sees real cross-store
 candidates with promos marked, picks one, and sees a trustworthy cheapest-store comparison.*
 
+### §4.0 — Navigation shell + Add/Search screen (new, added 2026-06-15)
+- **Goal:** add the tab-bar/menu navigation that §2.2c deliberately omitted (no second screen to
+  navigate to at the time), and build the **Add/Search** screen (`11` B.5) as that second screen —
+  search the owner's own terms, coin a new term, with `QuickAddSection` ×3 present but allowed to
+  render empty/static until §2.5 (favorites/recent/frequent) lands. Wires List screen's add-item
+  affordance to navigate to this screen instead of (or in addition to) the inline add-bar.
+- **Dep:** §2.2c (existing screens), §2.1 (UserProduct create-on-write — search/coin needs it)
+- **Canon:** `11` B.5 (Add/Search screen), B.10 (tab bar — was correctly omitted by §2.2c, now has
+  a second destination) · `10 §8.12` (`SearchBar`) · `10 §8.13` (`QuickAddSection`, may be
+  empty-state per-section until §2.5) · `11 Flow 3`/`Flow 11`.
+- **Iron:** search is **owner's own terms only** — no global product-catalog picker (`CLAUDE.md
+  §3`, `10` §2.6).
+- **Owner sees:** a tab bar / nav affordance now exists; tapping it opens a real Add/Search screen
+  (not a dead end); typing a term that doesn't exist yet offers "add as new term," never an error.
+- **Note:** this slice did not exist in the original M2→M5 plan — added per the 2026-06-15
+  re-sequencing (see note above M3) to avoid the app staying at "two screens" for the duration of
+  M3.
+
 ### §4.1 — Candidate read for a UserProduct (broad by default, promos marked)
 - **Goal:** opening a UserProduct returns every candidate offer across stores for its bucket, promos flagged; empty bucket returns `200` + empty `candidates[]` + `category_id: null` ("matching in progress").
-- **Dep:** §3.2, §2.1
+- **Dep:** §3.2, §2.1, §4.0 (Product Detail is reached from the Add/Search screen built in §4.0)
 - **Canon:** `06 §10`/`§12` (candidate shape; empty-bucket `200` not `409`; `basis` field) · `10 §3` · `11 Flow 10` · `CLAUDE.md §3` (broad by default, opt-in brand).
 - **Iron:** broad by default, opt-in brand anchor (§3); "current" price via validity query, Thu→Wed promo week (§2.5); REST response shape is a guarded contract (§5).
 - **Owner sees:** opens "мляко", sees offers from multiple stores with promo ones marked; a brand-new term shows "matching in progress," not an error.
@@ -267,6 +321,10 @@ M0 ─► M3 crawl/ingestion ───────────────┤
 M3 depends only on M0 (Money + schema + repositories), so **crawl/ingestion can be built in
 parallel with M1–M2** if the Owner wants two Codex tracks running — but M4 needs **both** M2 (terms)
 and M3 (offers) closed. Within each milestone, build top-to-bottom.
+
+**This diagram is dependency order, not build order** — see "Re-sequencing (2026-06-15)" above
+M3 for the actual order Slices are tackled in (§2.3 → §3.x → §4.0/§4.1 → §4.2 → §2.4 → §2.5 →
+§4.3 → M5).
 
 -----
 

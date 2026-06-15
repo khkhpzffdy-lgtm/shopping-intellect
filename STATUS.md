@@ -198,6 +198,13 @@ redesign of Lists overview + List screen, see
 `slices/13-2.2c-list-screens-visual-redesign.md`) is done — Owner verification
 on shopping.flux.bg against that slice's acceptance criteria is still pending.
 
+**Build order changed 2026-06-15** (see `13-implementation-line.md` "Re-sequencing"
+note above M3): after §2.3, the order is §3.1→§3.3 (crawler/ingestion, backend-only)
+→ **§4.0 (new)** navigation shell + Add/Search screen → §4.1 → §4.2 → §2.4 (Family)
+→ §2.5 (Favorites) → §4.3 (Comparison) → M5. Family/Favorites were pushed later;
+navigation + a second real screen (Add/Search) now comes right after the crawler,
+not at the end of M4.
+
 ---
 
 ## 4. Before you start work, checklist for the AI instance

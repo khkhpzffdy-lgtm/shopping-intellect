@@ -17,6 +17,7 @@ import {
   putListItem,
   putUserProduct,
   removeQueuedMutationsForEntity,
+  touchListUpdatedAt,
   updateMutationBody,
   type ListItemView,
   type ShoppingListRecord
@@ -244,7 +245,7 @@ export const HomeScreen = () => {
       };
 
       await putListItem(optimisticItem);
-      await putList({ ...selectedList, updated_at: now });
+      await touchListUpdatedAt(selectedList.client_uuid, now);
       await enqueueMutation({
         client_uuid: itemClientUuid,
         endpoint: selectedList.id ? `/lists/${selectedList.id}/items` : `/lists/${selectedList.client_uuid}/items`,

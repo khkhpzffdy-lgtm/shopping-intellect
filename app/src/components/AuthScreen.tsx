@@ -10,12 +10,16 @@ import {
 
 type Mode = 'login' | 'register';
 
-export const AuthScreen = () => {
+type AuthScreenProps = {
+  initialError?: string | null;
+};
+
+export const AuthScreen = ({ initialError = null }: AuthScreenProps) => {
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const submitLabel = mode === 'login' ? 'Вход' : 'Регистрация';

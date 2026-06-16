@@ -98,6 +98,54 @@ test('boot 200 shows lists overview and keeps token out of storage', async () =>
   expect(setItemSpy).not.toHaveBeenCalled();
 });
 
+test('boot restores a recent auth handoff without calling refresh first', async () => {
+  const accessToken = makeToken({ user_id: 42, family_ids: [7], display_name: 'Dora' });
+
+  sessionStorage.setItem(
+    'si_auth_handoff_v1',
+    JSON.stringify({
+      saved_at: Date.now(),
+      envelope: {
+        auth: { access_token: accessToken, expires_in: 900 },
+        user: { id: 42, display_name: 'Dora', family_ids: [7] }
+      }
+    })
+  );
+
+  renderApp();
+
+  expect(await screen.findByText('No lists yet')).toBeInTheDocument();
+  expect(useAuthStore.getState().accessToken).toBe(accessToken);
+  expect(mockFetch).not.toHaveBeenCalled();
+});
+
+test('boot retries refresh once before logging out', async () => {
+  const accessToken = makeToken({ user_id: 42, family_ids: [], display_name: 'Dora' });
+
+  vi.useFakeTimers();
+  mockFetch
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({ code: 'token_invalid', message: 'No refresh token present.' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    )
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({ auth: { access_token: accessToken, expires_in: 900 } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    );
+
+  renderApp();
+
+  await vi.advanceTimersByTimeAsync(400);
+
+  expect(await screen.findByText('No lists yet')).toBeInTheDocument();
+  expect(mockFetch).toHaveBeenCalledTimes(2);
+  vi.useRealTimers();
+});
+
 test('login success shows lists overview and invalid credentials stay on auth', async () => {
   mockFetch
     .mockResolvedValueOnce(

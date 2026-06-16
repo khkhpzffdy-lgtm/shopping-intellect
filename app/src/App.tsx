@@ -3,9 +3,13 @@ import { loginWithGoogle } from './api/client';
 import { ApiError } from './api/session';
 import {
   applyAuthEnvelope,
+  consumeAuthHandoff,
+  clearAuthHandoff,
   googleRedirectUri,
   normalizeSessionUser,
+  noteAuthBreadcrumb,
   refreshSession,
+  saveAuthHandoff,
   scheduleSilentRefresh
 } from './api/session';
 import { useAuthStore } from './store/auth';
@@ -15,6 +19,8 @@ import { HomeScreen } from './components/HomeScreen';
 import { SkeletonLoader } from './components/SkeletonLoader';
 
 type BootStatus = 'booting' | 'ready';
+
+const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 export default function App() {
   const [bootStatus, setBootStatus] = useState<BootStatus>('booting');
@@ -27,6 +33,7 @@ export default function App() {
     let active = true;
 
     const boot = async () => {
+      noteAuthBreadcrumb('boot started');
       setAuthError(null);
       const params = new URLSearchParams(window.location.search);
       const code = params.get('code');
@@ -43,9 +50,12 @@ export default function App() {
         );
 
         try {
+          noteAuthBreadcrumb('google callback detected');
           const response = await loginWithGoogle({ code, redirect_uri: googleRedirectUri() });
+          saveAuthHandoff(response);
           applyAuthEnvelope(response, normalizeSessionUser(response));
           scheduleSilentRefresh(Date.now() + response.auth.expires_in * 1000);
+          noteAuthBreadcrumb('google login succeeded');
           if (active) {
             setBootStatus('ready');
           }
@@ -58,11 +68,14 @@ export default function App() {
                   .join(', ')
               : null;
 
+            noteAuthBreadcrumb(`google login failed: ${detailMessage ?? error.message}`);
             setAuthError(detailMessage ? `Google login failed (${detailMessage})` : `Google login failed (${error.message})`);
           } else {
+            noteAuthBreadcrumb('google login failed: network error');
             setAuthError('Google login failed (network error)');
           }
 
+          clearAuthHandoff();
           useAuthStore.getState().clearSession();
         }
       }
@@ -76,10 +89,33 @@ export default function App() {
         return;
       }
 
+      const handoff = consumeAuthHandoff();
+      if (handoff) {
+        applyAuthEnvelope(handoff, normalizeSessionUser(handoff));
+        scheduleSilentRefresh(Date.now() + handoff.auth.expires_in * 1000);
+        noteAuthBreadcrumb('restored session from handoff');
+        if (active) {
+          setBootStatus('ready');
+        }
+        return;
+      }
+
       try {
         await refreshSession();
-      } catch {
-        useAuthStore.getState().clearSession();
+      } catch (firstError) {
+        noteAuthBreadcrumb(
+          `refresh failed on boot: ${firstError instanceof Error ? firstError.message : 'unknown'}`
+        );
+
+        try {
+          await wait(350);
+          await refreshSession();
+        } catch (secondError) {
+          noteAuthBreadcrumb(
+            `refresh retry failed on boot: ${secondError instanceof Error ? secondError.message : 'unknown'}`
+          );
+          useAuthStore.getState().clearSession();
+        }
       } finally {
         if (active) {
           setBootStatus('ready');

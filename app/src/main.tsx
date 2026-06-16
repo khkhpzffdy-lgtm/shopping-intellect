@@ -1,7 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { registerSW } from 'virtual:pwa-register';
 import App from './App';
 import './index.css';
 import './theme.css';
@@ -9,7 +8,11 @@ import './list-screens.css';
 
 const queryClient = new QueryClient();
 
-registerSW({ immediate: true });
+if ('serviceWorker' in navigator) {
+  void navigator.serviceWorker.getRegistrations().then((registrations) => {
+    void Promise.all(registrations.map((registration) => registration.unregister()));
+  });
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

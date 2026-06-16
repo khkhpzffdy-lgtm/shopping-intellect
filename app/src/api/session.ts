@@ -4,6 +4,10 @@ import type { AuthEnvelope, SessionEnvelope, SessionUser } from '../types/auth';
 let refreshTimeoutId: number | undefined;
 let refreshPromise: Promise<AuthEnvelope> | null = null;
 
+const AUTH_HANDOFF_KEY = 'si_auth_handoff_v1';
+const AUTH_BREADCRUMBS_KEY = 'si_auth_breadcrumbs_v1';
+const AUTH_HANDOFF_TTL_MS = 2 * 60 * 1000;
+
 const decodeBase64Url = (value: string) => {
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
   const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
@@ -53,6 +57,69 @@ export const applyAuthEnvelope = (
   });
 };
 
+export const noteAuthBreadcrumb = (event: string) => {
+  try {
+    const existing = sessionStorage.getItem(AUTH_BREADCRUMBS_KEY);
+    const breadcrumbs = existing ? (JSON.parse(existing) as string[]) : [];
+    const next = [...breadcrumbs.slice(-11), `${new Date().toISOString()} ${event}`];
+    sessionStorage.setItem(AUTH_BREADCRUMBS_KEY, JSON.stringify(next));
+  } catch {
+    // Best-effort diagnostics only.
+  }
+};
+
+export const saveAuthHandoff = (envelope: SessionEnvelope) => {
+  try {
+    sessionStorage.setItem(
+      AUTH_HANDOFF_KEY,
+      JSON.stringify({
+        saved_at: Date.now(),
+        envelope
+      })
+    );
+    noteAuthBreadcrumb('saved auth handoff');
+  } catch {
+    // Best-effort recovery only.
+  }
+};
+
+export const consumeAuthHandoff = (): SessionEnvelope | null => {
+  try {
+    const raw = sessionStorage.getItem(AUTH_HANDOFF_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as {
+      saved_at?: number;
+      envelope?: SessionEnvelope;
+    };
+
+    if (
+      typeof parsed.saved_at !== 'number' ||
+      !parsed.envelope ||
+      Date.now() - parsed.saved_at > AUTH_HANDOFF_TTL_MS
+    ) {
+      sessionStorage.removeItem(AUTH_HANDOFF_KEY);
+      return null;
+    }
+
+    noteAuthBreadcrumb('consumed auth handoff');
+    return parsed.envelope;
+  } catch {
+    sessionStorage.removeItem(AUTH_HANDOFF_KEY);
+    return null;
+  }
+};
+
+export const clearAuthHandoff = () => {
+  try {
+    sessionStorage.removeItem(AUTH_HANDOFF_KEY);
+  } catch {
+    // Best-effort cleanup only.
+  }
+};
+
 export const clearScheduledRefresh = () => {
   if (refreshTimeoutId !== undefined) {
     window.clearTimeout(refreshTimeoutId);
@@ -83,6 +150,7 @@ export const normalizeSessionUser = (response: SessionEnvelope): SessionUser => 
 
 export const refreshSession = async (): Promise<AuthEnvelope> => {
   if (!refreshPromise) {
+    noteAuthBreadcrumb('refresh started');
     refreshPromise = fetchAuth<AuthEnvelope>('/auth/refresh', { method: 'POST' });
   }
 
@@ -90,6 +158,8 @@ export const refreshSession = async (): Promise<AuthEnvelope> => {
     const envelope = await refreshPromise;
     applyAuthEnvelope(envelope);
     scheduleSilentRefresh(useAuthStore.getState().expiresAt);
+    clearAuthHandoff();
+    noteAuthBreadcrumb('refresh succeeded');
     return envelope;
   } finally {
     refreshPromise = null;

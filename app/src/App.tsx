@@ -67,6 +67,13 @@ export default function App() {
         }
       }
 
+      if (useAuthStore.getState().accessToken) {
+        if (active) {
+          setBootStatus('ready');
+        }
+        return;
+      }
+
       try {
         await refreshSession();
       } catch {

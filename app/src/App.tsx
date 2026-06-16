@@ -67,6 +67,8 @@ export default function App() {
         }
       }
 
+      // After an OAuth callback, React can re-run boot while the in-memory access
+      // token is already set but before any cookie-based refresh is needed.
       if (useAuthStore.getState().accessToken) {
         if (active) {
           setBootStatus('ready');

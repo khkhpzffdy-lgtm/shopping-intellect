@@ -218,14 +218,14 @@ above. Pushed to `main` (`be211c9`), CI build+deploy green. Owner verification o
 shopping.flux.bg of §2.3's reconnect-drain acceptance criteria (and the still-
 pending §2.2c criteria) is outstanding.
 
-**Next up: §3.2** — `IngestionService` (validate, categorize, persist `RawOffer` DTOs to DB).
+**Next up: §4.0** — navigation shell + Add/Search screen (frontend, `app/`).
 
-**Build order (2026-06-15 re-sequencing, see `13-implementation-line.md`
-"Re-sequencing" note above M3):** §2.3 (done) → **§3.1 (next)** → §3.2 → §3.3
-(crawler/ingestion, backend-only) → **§4.0 (new)** navigation shell + Add/Search
-screen → §4.1 → §4.2 → §2.4 (Family) → §2.5 (Favorites) → §4.3 (Comparison) → M5.
-Family/Favorites were pushed later; navigation + a second real screen (Add/Search)
-comes right after the crawler, not at the end of M4.
+**Build order (2026-06-17 re-sequencing):** §3.1 (done) → **§4.0 → §4.1 → §4.2 → §4.3**
+(full user-facing comparison flow first) → **§3.2 → §3.3** (IngestionService + cron, now
+has a UI to feed) → §2.4 (Family) → §2.5 (Favorites) → M5.
+Rationale: crawlers have no visible payoff until the user can see comparison results.
+Build the screens first so when §3.2 ships and the crawler runs, prices immediately
+appear in the UI. See `13-implementation-line.md` "Re-sequencing" for full reasoning.
 
 ---
 

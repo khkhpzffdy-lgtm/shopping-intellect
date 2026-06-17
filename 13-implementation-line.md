@@ -180,30 +180,33 @@ their own terms, offline, and have it sync.*
 
 -----
 
-## Re-sequencing (2026-06-15) — build order vs. dependency order
+## Re-sequencing (2026-06-17, revised) — build order vs. dependency order
 
 The numbering above (§2.4/§2.5 before M3/M4) reflects **dependency order** and stays as the
-canonical reference for *what depends on what*. The actual **build order** the Owner asked for
-diverges from it, because two screens (Lists overview, List screen) for months felt too thin and
-Family/Favorites aren't the most valuable next payoff. Build in this order instead:
+canonical reference for *what depends on what*. The actual **build order** diverges from it.
+
+**Revised build order (2026-06-17):**
 
 ```
-§2.3 (done) → §3.1 → §3.2 → §3.3 → §4.1 + nav-and-AddSearch → §4.2 → §2.4 → §2.5 → §4.3 → M5
+§2.3 (done) → §3.1 (done) → §4.0 → §4.1 → §4.2 → §4.3 → §3.2 → §3.3 → §2.4 → §2.5 → M5
 ```
 
-- **§3.1–§3.3 (crawl/ingestion)** next — backend-only, depends only on M0, no screen changes.
-  Real offers landing in the DB unblocks §4.1 immediately after.
-- **§4.1 + a new navigation/Add-Search slice** — introduces the app's **second real screen**
-  (Add/Search, `11` B.5) plus the tab-bar/menu navigation shell (`11` B.10 omitted scope from
-  §2.2c). This is the first slice after §2.3 that changes what the Owner sees day-to-day,
-  rather than waiting until M4 as originally laid out.
-- **§4.2 (match-by-selection + brand anchor)** follows directly — same screens (Add/Search,
-  Product Detail), no new dependencies.
-- **§2.4 (Family) then §2.5 (Favorites)** — moved here. Dependency-wise §2.4 only needs §2.3
-  and §2.5 only needs §2.4, both of which are satisfied well before this point; nothing in
-  §3.x/§4.1/§4.2 depends on Family or Favorites, so this reorder is dependency-safe.
-- **§4.3 (Comparison)** last in M2–M4 — its declared dep on §2.5 (favorites/frequent) is now
-  satisfied by the time we reach it.
+**Why this order:**
+
+- **§3.1 (done)** — crawler base built first, but the Owner correctly identified that crawlers
+  have no payoff until the user can see comparison results. The remaining §3.x slices (ingestion,
+  cron) are moved *after* the frontend screens that consume the data.
+- **§4.0 → §4.1 → §4.2 → §4.3 (next)** — the full user-facing comparison flow comes first.
+  This is what the user actually experiences: navigation shell + Add/Search screen, then candidate
+  offers, then match-by-selection, then basket comparison. The Owner can verify real product
+  behaviour at each step. For §4.1 and §4.2, the DB will have no real StoreOffer rows yet —
+  that is fine, the endpoints return empty results gracefully (`200` with empty array), and the
+  UI handles it. The Owner can manually seed 1–2 test rows if needed to verify the flow.
+- **§3.2 → §3.3 (after §4.x)** — IngestionService and the cron CLI now have a UI to feed.
+  When §3.2 ships and the crawler runs, the Owner will immediately see real prices appear in
+  the §4.3 Comparison screen — a concrete, visible payoff rather than abstract DB rows.
+- **§2.4 (Family) then §2.5 (Favorites)** — dependency-safe here; nothing in §3.x or §4.x
+  depends on them.
 - **M5** unchanged at the end.
 
 If a future session re-derives the build order from this file without reading this note, the

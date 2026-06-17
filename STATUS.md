@@ -125,7 +125,7 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 | §4.0 | Navigation shell + Add/Search screen (`BottomNav`, `AddSearchScreen`, `App.tsx` tab state, `HomeScreen`/`ListScreen` wired) | ✅ done |
 | §2.3c | `SyncStatusIndicator` icon-only redesign + offline banner (supersedes §2.2d item 1) | ✅ done |
 | §2.2d | UI consistency cleanup: `EmptyState` wired + translated, one-language copy pass, list-screen search icon → Add/Search | ✅ done |
-| §2.3d | Pull lists/items from server on boot — fixes "different browsers, same account, different lists" | ⏳ next |
+| §2.3d | Pull lists/items from server on boot — fixes "different browsers, same account, different lists" | ✅ done |
 
 **App (`app/`):** Vite + React PWA, FTP deploy wired. Implemented so far:
 - `AuthScreen` — register/login screen, working against the plugin's auth endpoints
@@ -321,10 +321,35 @@ boot-time/list-open pull. Confirmed by reading `ListController.php` directly: it
 **`slices/13-2.3d-server-pull-on-boot.md`** — adds `GET /lists`/`GET /lists/{id}` calls,
 a local IndexedDB merge with last-write-wins + a pending-mutation guard (so an unsynced
 local edit is never clobbered by a stale server read), wired into `HomeScreen.tsx`'s
-existing boot/list-open `useEffect`s, silently no-op on offline boot. Not yet built.
+existing boot/list-open `useEffect`s, silently no-op on offline boot.
+
+**§2.3d is done (2026-06-17).** `app/src/api/client.ts` gained `fetchLists()`/
+`fetchListWithItems(id)`; `app/src/storage/db.ts` gained `mergeServerList()`/
+`mergeServerListItem()` (skip the merge entirely if a pending/in_flight/failed mutation
+is queued against that entity — an unsynced local edit always wins over a stale server
+read; otherwise last-write-wins on `updated_at` per `07 §4.3`); `HomeScreen.tsx`'s boot
+`useEffect` now fetches `GET /lists` after the existing local-first `refreshLists()` and
+merges the result in, and the list-open `useEffect` does the same with
+`GET /lists/{id}` once the open list has a server `id`. Both fetches fail silently
+(matching the existing mutation-flush `try/finally` pattern in the same file) so offline
+boot is unaffected. **Paired plugin-repo fix:** `plugin/src/Api/ListController.php`'s
+`listData()`/`itemData()` now return `client_uuid` (the column was already stored, just
+never returned) — pushed to the plugin repo (`9ce5f5d`) ahead of the frontend change.
+Four new Vitest regression tests added to `App.test.tsx` (server-only list appears on
+boot; a pending-mutation list is not overwritten by a stale server read; offline boot
+with a rejecting `GET /lists` still renders local data with no error; opening a list
+pulls its items from `GET /lists/{id}`) — all four pass in isolation. Verified
+end-to-end with a two-Playwright-browser-context script simulating the exact reported
+bug (list + item created in one context, fresh context logged into the same account):
+both now appear after the fresh context's boot/list-open, confirming the fix.
+`npx tsc --noEmit`, `npm run build`, and the full PHPUnit suite (88 tests) all pass.
+The same pre-existing sandbox flakiness on `App.test.tsx`'s full-file run (hook
+timeouts, noted in the §2.3c and §2.2d entries above) persists — unrelated to this
+slice's changes; the unaffected test files (`bottomNav`, `offlineBanner`,
+`syncStatusIndicator`, `theme`, `db`, `connectivity`) all pass clean.
 
 **Build order (2026-06-17, revised same day):** §3.1 (done) → §4.0 (done) → §2.3a (done) → §2.3b (done) → §2.3c (done)
-→ §2.2d (done) → **§2.3d (next — fixes the cross-browser/same-account bug above)** → §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 (Family) → §2.5 (Favorites) → M5.
+→ §2.2d (done) → **§2.3d (done)** → §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 (Family) → §2.5 (Favorites) → M5.
 Rationale: §4.0 is pure frontend with no DB dependency. §3.2/§3.3 (ingestion + cron) follow
 immediately so real offers are in the DB before §4.1 ships — the Owner sees real prices from
 day one, not empty state. §2.3a/§2.3b/§2.3c jumped the queue ahead of §2.2d same day — see incident

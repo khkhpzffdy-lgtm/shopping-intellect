@@ -234,13 +234,20 @@ export class ApiError extends Error {
 }
 
 export const fetchAuth = async <T>(path: string, init: FetchAuthInit): Promise<T> => {
+  // `new Headers(init.headers)` correctly copies entries whether init.headers
+  // is undefined, a plain object, or a Headers instance. Spreading a Headers
+  // instance (`{...headers}`) silently drops every entry — it has no own
+  // enumerable properties — which was dropping the Authorization header on
+  // every authenticated request.
+  const headers = new Headers(init.headers);
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
   const response = await fetch(buildUrl(path), {
     ...init,
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init.headers ?? {})
-    }
+    headers
   });
 
   if (!response.ok) {

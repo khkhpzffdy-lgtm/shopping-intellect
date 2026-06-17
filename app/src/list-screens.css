@@ -40,7 +40,7 @@
 }
 .si-root .addbar__field {
   flex: 1; border: none; background: transparent; outline: none;
-  color: var(--ink); font-size: var(--fs-body); min-width: 0;
+  color: var(--ink); font-size: max(16px, var(--fs-body)); min-width: 0;
 }
 .si-root .addbar__field::placeholder { color: var(--placeholder); }
 .si-root .addbar__mic { color: var(--ink-2); display: flex; flex-shrink: 0; }

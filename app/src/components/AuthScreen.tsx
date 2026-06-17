@@ -59,7 +59,8 @@ export const AuthScreen = ({ initialError = null }: AuthScreenProps) => {
     background: 'var(--input)',
     borderColor: 'var(--line)',
     color: 'var(--ink)',
-    borderRadius: 'var(--radius-sm)'
+    borderRadius: 'var(--radius-sm)',
+    fontSize: '16px'
   };
 
   return (

@@ -111,7 +111,7 @@ input {
   outline: none;
   background: transparent;
   color: var(--ink);
-  font-size: var(--fs-h2);
+  font-size: max(16px, var(--fs-h2));
 }
 
 .listcard {

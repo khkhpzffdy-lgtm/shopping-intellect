@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import type { ShoppingListRecord } from '../storage/db';
+import { SyncStatusIndicator } from './SyncStatusIndicator';
 
 type ListsScreenProps = {
   lists: ShoppingListRecord[];
   itemCounts: Record<string, number>;
-  pendingCounts: Record<string, number>;
+  mutationStatusCounts: Record<string, { pending: number; failed: number }>;
   createName: string;
   errorMessage: string | null;
   onCreateNameChange: (value: string) => void;
@@ -15,17 +16,10 @@ type ListsScreenProps = {
   onLogout: () => void;
 };
 
-const SyncStatusIndicator = ({ pendingCount }: { pendingCount: number }) => (
-  <span className="listcard__badge">
-    <span className={`sync__dot${pendingCount > 0 ? ' sync__dot--pending' : ''}`} aria-hidden="true" />
-    {pendingCount > 0 ? `sync-pending ${pendingCount}` : 'synced'}
-  </span>
-);
-
 export const ListsScreen = ({
   lists,
   itemCounts,
-  pendingCounts,
+  mutationStatusCounts,
   createName,
   errorMessage,
   onCreateNameChange,
@@ -158,7 +152,10 @@ export const ListsScreen = ({
               <h2 className="listcard__name">{list.name}</h2>
               <p className="listcard__meta">{itemCounts[list.client_uuid] ?? 0} items</p>
             </div>
-            <SyncStatusIndicator pendingCount={pendingCounts[list.client_uuid] ?? 0} />
+            <SyncStatusIndicator
+              pending={mutationStatusCounts[list.client_uuid]?.pending ?? 0}
+              failed={mutationStatusCounts[list.client_uuid]?.failed ?? 0}
+            />
           </button>
         ))}
       </div>

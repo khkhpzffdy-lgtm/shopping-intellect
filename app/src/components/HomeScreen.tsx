@@ -10,7 +10,7 @@ import {
   getListItems,
   getListItemCounts,
   getLists,
-  getPendingMutationCounts,
+  getMutationStatusCounts,
   getUserProductByTerm,
   markMutationInFlight,
   putList,
@@ -61,7 +61,7 @@ export const HomeScreen = ({ onOpenAddSearch, onItemAdded }: HomeScreenProps) =>
   const [lists, setLists] = useState<ShoppingListRecord[]>([]);
   const [selectedListKey, setSelectedListKey] = useState<string | null>(null);
   const [items, setItems] = useState<ListItemView[]>([]);
-  const [pendingCounts, setPendingCounts] = useState<Record<string, number>>({});
+  const [mutationStatusCounts, setMutationStatusCounts] = useState<Record<string, { pending: number; failed: number }>>({});
   const [itemCounts, setItemCounts] = useState<Record<string, number>>({});
   const [createName, setCreateName] = useState('');
   const [draft, setDraft] = useState({ term: '', quantity: '', unit: '' });
@@ -75,20 +75,20 @@ export const HomeScreen = ({ onOpenAddSearch, onItemAdded }: HomeScreenProps) =>
     [lists, selectedListKey]
   );
 
-  const refreshPendingCounts = async () => {
-    setPendingCounts(await getPendingMutationCounts());
+  const refreshMutationStatusCounts = async () => {
+    setMutationStatusCounts(await getMutationStatusCounts());
   };
 
   const refreshLists = async () => {
     setLists(await getLists());
     setItemCounts(await getListItemCounts());
-    await refreshPendingCounts();
+    await refreshMutationStatusCounts();
   };
 
   const refreshItems = async (listKey: string) => {
     setItems(await getListItems(listKey));
     setItemCounts(await getListItemCounts());
-    await refreshPendingCounts();
+    await refreshMutationStatusCounts();
   };
 
   useEffect(() => {
@@ -373,7 +373,7 @@ export const HomeScreen = ({ onOpenAddSearch, onItemAdded }: HomeScreenProps) =>
           <ListScreen
             list={selectedList}
             items={items}
-            pendingCounts={pendingCounts}
+            mutationStatusCounts={mutationStatusCounts}
             errorMessage={errorMessage}
             draft={draft}
             onDraftChange={(field, value) => setDraft((current) => ({ ...current, [field]: value }))}
@@ -387,7 +387,7 @@ export const HomeScreen = ({ onOpenAddSearch, onItemAdded }: HomeScreenProps) =>
           <ListsScreen
             lists={lists}
             itemCounts={itemCounts}
-            pendingCounts={pendingCounts}
+            mutationStatusCounts={mutationStatusCounts}
             createName={createName}
             errorMessage={errorMessage}
             onCreateNameChange={setCreateName}

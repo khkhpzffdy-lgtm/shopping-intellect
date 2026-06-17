@@ -150,3 +150,18 @@
 }
 .si-root .sync__dot { width: 7px; height: 7px; border-radius: 50%; background: #2FA968; display: inline-block; }
 .si-root .sync__dot--pending { background: var(--promo); }
+
+/* ---- OfflineBanner ---- */
+.si-root .offline-banner {
+  display: flex; align-items: center; gap: 10px;
+  margin: 6px 16px 12px; padding: 11px 14px;
+  background: var(--promo-soft); border-radius: 14px;
+  font-size: var(--fs-sm); color: var(--promo-text); font-weight: 600;
+}
+.si-root .offline-banner svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+/* ---- SyncStatusIndicator ---- */
+.si-root .sync-icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 18px; height: 18px; }
+.si-root .sync-icon svg { width: 18px; height: 18px; }
+.si-root .sync-icon--pending { color: var(--promo); }
+.si-root .sync-icon--failed { color: var(--danger); }

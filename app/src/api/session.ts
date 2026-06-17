@@ -1,4 +1,5 @@
 import { useAuthStore } from '../store/auth';
+import { useConnectivityStore } from '../store/connectivity';
 import type { AuthEnvelope, SessionEnvelope, SessionUser } from '../types/auth';
 
 let refreshTimeoutId: number | undefined;
@@ -244,11 +245,22 @@ export const fetchAuth = async <T>(path: string, init: FetchAuthInit): Promise<T
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(buildUrl(path), {
-    ...init,
-    credentials: 'include',
-    headers
-  });
+  let response: Response;
+  try {
+    response = await fetch(buildUrl(path), {
+      ...init,
+      credentials: 'include',
+      headers
+    });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      useConnectivityStore.getState().setOnline(false);
+    }
+    throw error;
+  }
+
+  // Reaching the server at all — even a 4xx/5xx — proves connectivity.
+  useConnectivityStore.getState().setOnline(true);
 
   if (!response.ok) {
     const error = await parseError(response);

@@ -20,6 +20,7 @@ import { HomeScreen } from './components/HomeScreen';
 import { BottomNav } from './components/BottomNav';
 import { AddSearchScreen } from './components/AddSearchScreen';
 import { SkeletonLoader } from './components/SkeletonLoader';
+import { OfflineBanner } from './components/OfflineBanner';
 
 type BootStatus = 'booting' | 'ready';
 type ActiveTab = 'lists' | 'add';
@@ -182,6 +183,7 @@ export default function App() {
 
   return (
     <div className="si-root min-h-screen" data-theme={theme} style={{ paddingBottom: isLoggedIn ? 64 : 0 }}>
+      <OfflineBanner />
       {bootStatus === 'booting' ? (
         <div className="px-4 py-6 md:px-8"><SkeletonLoader shape="card" /></div>
       ) : null}

@@ -187,17 +187,21 @@ export const getQueuedMutations = async (statuses: SyncStatus[] = ['pending', 'f
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
 };
 
-export const getPendingMutationCounts = async () => {
+export const getMutationStatusCounts = async (): Promise<Record<string, { pending: number; failed: number }>> => {
   const db = await getDb();
   const mutations = await db.getAll('mutation_queue');
-  return mutations.reduce<Record<string, number>>((counts, mutation) => {
-    if (
-      mutation.status === 'pending' ||
-      mutation.status === 'in_flight' ||
-      mutation.status === 'failed'
-    ) {
-      counts[mutation.entity_client_uuid] = (counts[mutation.entity_client_uuid] ?? 0) + 1;
+  return mutations.reduce<Record<string, { pending: number; failed: number }>>((counts, mutation) => {
+    if (mutation.status !== 'pending' && mutation.status !== 'in_flight' && mutation.status !== 'failed') {
+      return counts;
     }
+
+    const entry = counts[mutation.entity_client_uuid] ?? { pending: 0, failed: 0 };
+    if (mutation.status === 'failed') {
+      entry.failed += 1;
+    } else {
+      entry.pending += 1;
+    }
+    counts[mutation.entity_client_uuid] = entry;
     return counts;
   }, {});
 };

@@ -123,6 +123,7 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 | §2.3b | Unify the frontend mutation pipeline (one `sendMutation`, no per-screen copies) | ✅ done |
 | §3.1 | `HttpClient` interface + `WpHttpClient` + `AbstractCrawler` + `LidlCrawler` stub + `RawOffer` DTO + `bin/crawl.php` | ✅ done |
 | §4.0 | Navigation shell + Add/Search screen (`BottomNav`, `AddSearchScreen`, `App.tsx` tab state, `HomeScreen`/`ListScreen` wired) | ✅ done |
+| §2.3c | `SyncStatusIndicator` icon-only redesign + offline banner (supersedes §2.2d item 1) | ✅ done |
 
 **App (`app/`):** Vite + React PWA, FTP deploy wired. Implemented so far:
 - `AuthScreen` — register/login screen, working against the plugin's auth endpoints
@@ -189,6 +190,41 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
   `App.test.tsx` proving the unsynced-parent-list add now reaches the network.
   Pushed to `main`.
 
+- **§2.3c sync indicator + offline banner (done):** `app/src/store/connectivity.ts`
+  (Zustand `useConnectivityStore`, `{ isOnline }`) seeded from `navigator.onLine` and
+  kept current by `window`'s `online`/`offline` events plus `fetchAuth()` in
+  `app/src/api/session.ts` — a `TypeError` from `fetch()` itself (network/DNS failure)
+  flips it to `false`; any response that completes (even 4xx/5xx) flips it back to
+  `true`, since reaching the server at all proves connectivity. `app/src/components/
+  OfflineBanner.tsx` renders the exact `design/screens2.jsx` copy ("Офлайн ·
+  отметките се запазват и ще се синхронизират") with the ported `wifiOff` icon
+  (now in `app/src/components/icons.tsx` alongside two new icons, `SyncPendingIcon`/
+  `SyncFailedIcon`, matching `design/ui.jsx`'s stroke style); rendered once, fixed at
+  the top, from `App.tsx`. `db.ts`'s `getPendingMutationCounts` is replaced by
+  `getMutationStatusCounts(): Record<string, {pending, failed}>`, splitting
+  `pending`/`in_flight` from `failed` per entity. `HomeScreen.tsx`'s
+  `refreshPendingCounts`/`pendingCounts` are renamed `refreshMutationStatusCounts`/
+  `mutationStatusCounts` accordingly. The two inline `SyncStatusIndicator` copies in
+  `ListScreen.tsx` and `ListsScreen.tsx` (the `§2.2d` item-1 dupe) are deleted and
+  replaced by one shared `app/src/components/SyncStatusIndicator.tsx`: renders
+  nothing when both counts are zero (the common synced/online case — no badge, no
+  text), the warning-triangle icon when `failed > 0` (always shown, even online, per
+  `10-ux-rules.md` §7 — a real rejection is never hidden), else the refresh-arrows
+  icon when `pending > 0`. Both icon states carry an `aria-label`/`title` for
+  accessibility despite being visually icon-only. New tests:
+  `app/src/test/connectivity.test.ts`, `offlineBanner.test.tsx`,
+  `syncStatusIndicator.test.tsx`, `db.test.ts` (`getMutationStatusCounts`
+  independent-per-entity counts). No existing test asserted on the old
+  `'sync-pending N'`/`'synced'` text, so nothing needed updating there. Build
+  (`npm run build`) passes. **Supersedes `§2.2d` SCOPE item 1** (dedupe
+  `SyncStatusIndicator`) — skip it when `§2.2d` runs. Pushed to `main`.
+  **Note:** this session's sandbox shows `App.test.tsx`/`flush.test.ts`/
+  `sendMutation.test.ts`/`addSearch.test.tsx` failing on 10s hook timeouts and a
+  `btoa` "Invalid character" error — confirmed via `git stash` to be **pre-existing
+  or environment-specific**, not caused by this slice (identical failures on a clean
+  checkout before any `§2.3c` change). Worth a look in a normal dev environment
+  before assuming they're still broken there.
+
 This list is **not guaranteed complete or current** — if it looks stale, check
 `app/src/components/` and `app/src/App.tsx` directly rather than trusting this.
 
@@ -242,10 +278,11 @@ above. Pushed to `main` (`be211c9`), CI build+deploy green. Owner verification o
 shopping.flux.bg of §2.3's reconnect-drain acceptance criteria (and the still-
 pending §2.2c criteria) is outstanding.
 
-**Next up: §2.3c** — `SyncStatusIndicator` redesign + offline banner, now displaying the unified queue.
+**Next up: §2.2d** (remaining items 2-4 — item 1 is done via §2.3c) — see open question below on whether
+§2.2d or §3.2 runs next; Owner has not yet confirmed which.
 
-**Build order (2026-06-17, revised same day):** §3.1 (done) → §4.0 (done) → §2.3a (done) → §2.3b (done) → **§2.3c**
-→ §2.2d → §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 (Family) → §2.5 (Favorites) → M5.
+**Build order (2026-06-17, revised same day):** §3.1 (done) → §4.0 (done) → §2.3a (done) → §2.3b (done) → §2.3c (done)
+→ **§2.2d** → §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 (Family) → §2.5 (Favorites) → M5.
 Rationale: §4.0 is pure frontend with no DB dependency. §3.2/§3.3 (ingestion + cron) follow
 immediately so real offers are in the DB before §4.1 ships — the Owner sees real prices from
 day one, not empty state. §2.3a/§2.3b/§2.3c jumped the queue ahead of §2.2d same day — see incident
@@ -287,9 +324,9 @@ mix (`ListScreen.tsx`/`EmptyState.tsx`/`HomeScreen.tsx` error strings are Englis
 `ListsScreen.tsx`/`AddSearchScreen.tsx` are Bulgarian); and `ListScreen.tsx`'s `onOpenAddSearch`
 prop is threaded all the way from `App.tsx` but never called by any button. Full findings +
 build instructions in `slices/13-2.2d-ui-consistency-cleanup.md`. **Item 1 (dedupe
-`SyncStatusIndicator`) is now superseded by `§2.3c`** (added same day, runs first per the
-revised build order below) — skip item 1 when this slice actually runs, it'll already be done.
-Slotted in before §3.2 — see
+`SyncStatusIndicator`) is done — `§2.3c` (closed 2026-06-17) superseded it** by replacing
+both inline copies with a new shared component anyway — skip item 1 when this slice
+runs. Slotted in before §3.2 — see
 `13-implementation-line.md` §2.2d. Also see new `14-user-stories.md` (user stories per flow,
 flags that there is no `PATCH`/`DELETE /lists/{id}` anywhere in the canon — no way to rename or
 delete a whole list today — as an open `decisions.md §14` candidate, not invented here).

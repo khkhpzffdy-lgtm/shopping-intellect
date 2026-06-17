@@ -1,10 +1,11 @@
 import type { ListItemView, ShoppingListRecord } from '../storage/db';
 import { useListModeStore } from '../store/listMode';
+import { SyncStatusIndicator } from './SyncStatusIndicator';
 
 type ListScreenProps = {
   list: ShoppingListRecord;
   items: ListItemView[];
-  pendingCounts: Record<string, number>;
+  mutationStatusCounts: Record<string, { pending: number; failed: number }>;
   errorMessage: string | null;
   draft: {
     term: string;
@@ -19,19 +20,12 @@ type ListScreenProps = {
   onRemoveItem: (item: ListItemView) => void;
 };
 
-const SyncStatusIndicator = ({ pendingCount }: { pendingCount: number }) => (
-  <span className="listcard__badge">
-    <span className={`sync__dot${pendingCount > 0 ? ' sync__dot--pending' : ''}`} aria-hidden="true" />
-    {pendingCount > 0 ? `sync-pending ${pendingCount}` : 'synced'}
-  </span>
-);
-
 const ITEM_EMOJI = '🛒';
 
 export const ListScreen = ({
   list,
   items,
-  pendingCounts,
+  mutationStatusCounts,
   errorMessage,
   draft,
   onDraftChange,
@@ -51,7 +45,10 @@ export const ListScreen = ({
           ←
         </button>
         <div className="appbar__title">{list.name}</div>
-        <SyncStatusIndicator pendingCount={pendingCounts[list.client_uuid] ?? 0} />
+        <SyncStatusIndicator
+          pending={mutationStatusCounts[list.client_uuid]?.pending ?? 0}
+          failed={mutationStatusCounts[list.client_uuid]?.failed ?? 0}
+        />
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -126,7 +123,10 @@ export const ListScreen = ({
                 </div>
                 <p style={{ color: 'var(--ink-3)', fontSize: 'var(--fs-xs)', marginTop: '4px' }}>Expand details soon</p>
               </div>
-              <SyncStatusIndicator pendingCount={pendingCounts[item.client_uuid] ?? 0} />
+              <SyncStatusIndicator
+                pending={mutationStatusCounts[item.client_uuid]?.pending ?? 0}
+                failed={mutationStatusCounts[item.client_uuid]?.failed ?? 0}
+              />
               <button type="button" onClick={() => onRemoveItem(item)} className="git__remove">
                 Remove
               </button>
@@ -155,7 +155,10 @@ export const ListScreen = ({
                   {item.quantity} {item.unit}
                 </span>
               </button>
-              <SyncStatusIndicator pendingCount={pendingCounts[item.client_uuid] ?? 0} />
+              <SyncStatusIndicator
+                pending={mutationStatusCounts[item.client_uuid]?.pending ?? 0}
+                failed={mutationStatusCounts[item.client_uuid]?.failed ?? 0}
+              />
               <button type="button" onClick={() => onRemoveItem(item)} className="git__remove">
                 Remove
               </button>

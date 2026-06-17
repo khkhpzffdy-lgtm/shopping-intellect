@@ -47,7 +47,9 @@ export const apiRequest = async <T>(
       try {
         await refreshSession();
       } catch {
-        useAuthStore.getState().clearSession();
+        // Refresh failed (network hiccup, Safari blocked cookie, etc.).
+        // Do NOT clear the session — the user stays logged in and the next
+        // proactive refresh (visibilitychange / focus) will retry.
         throw error;
       }
 
@@ -57,14 +59,6 @@ export const apiRequest = async <T>(
         authenticated,
         retryOnExpired: false
       });
-    }
-
-    if (
-      error instanceof ApiError &&
-      error.status === 401 &&
-      (error.code === 'token_invalid' || error.code === 'token_reuse_detected')
-    ) {
-      useAuthStore.getState().clearSession();
     }
 
     throw error;

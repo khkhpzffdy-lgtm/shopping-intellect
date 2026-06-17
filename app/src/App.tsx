@@ -24,6 +24,9 @@ import { SkeletonLoader } from './components/SkeletonLoader';
 type BootStatus = 'booting' | 'ready';
 type ActiveTab = 'lists' | 'add';
 
+const isTokenExpiredOrMissing = (expiresAt: number | null) =>
+  expiresAt === null || Date.now() >= expiresAt - 30_000;
+
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 export default function App() {
@@ -62,50 +65,44 @@ export default function App() {
           applyAuthEnvelope(response, normalizeSessionUser(response));
           scheduleSilentRefresh(Date.now() + response.auth.expires_in * 1000);
           noteAuthBreadcrumb('google login succeeded');
-          if (active) {
-            setBootStatus('ready');
-          }
+          if (active) setBootStatus('ready');
           return;
         } catch (error) {
           if (error instanceof ApiError) {
             const detailMessage = error.details
-              ? Object.entries(error.details)
-                  .map(([key, value]) => `${key}: ${value}`)
-                  .join(', ')
+              ? Object.entries(error.details).map(([k, v]) => `${k}: ${v}`).join(', ')
               : null;
-
             noteAuthBreadcrumb(`google login failed: ${detailMessage ?? error.message}`);
             setAuthError(detailMessage ? `Google login failed (${detailMessage})` : `Google login failed (${error.message})`);
           } else {
             noteAuthBreadcrumb('google login failed: network error');
             setAuthError('Google login failed (network error)');
           }
-
           clearAuthHandoff();
           useAuthStore.getState().clearSession();
         }
       }
 
-      // After an OAuth callback, React can re-run boot while the in-memory access
-      // token is already set but before any cookie-based refresh is needed.
+      // In-memory token still valid — no refresh needed.
       if (useAuthStore.getState().accessToken) {
-        if (active) {
-          setBootStatus('ready');
-        }
+        if (active) setBootStatus('ready');
         return;
       }
 
+      // Handoff from a recent login/redirect (sessionStorage, TTL 10 min).
       const handoff = consumeAuthHandoff();
       if (handoff) {
         applyAuthEnvelope(handoff, normalizeSessionUser(handoff));
         scheduleSilentRefresh(Date.now() + handoff.auth.expires_in * 1000);
         noteAuthBreadcrumb('restored session from handoff');
-        if (active) {
-          setBootStatus('ready');
-        }
+        if (active) setBootStatus('ready');
         return;
       }
 
+      // Try to restore from httpOnly refresh cookie.
+      // On failure we land on the auth screen — but ONLY for explicit auth errors
+      // (token_invalid / token_reuse_detected). Network errors leave the user logged
+      // in so a brief offline moment or slow connection never forces a re-login.
       try {
         await refreshSession();
       } catch (firstError) {
@@ -113,34 +110,73 @@ export default function App() {
           `refresh failed on boot: ${firstError instanceof Error ? firstError.message : 'unknown'}`
         );
 
-        try {
-          await wait(350);
-          await refreshSession();
-        } catch (secondError) {
-          noteAuthBreadcrumb(
-            `refresh retry failed on boot: ${secondError instanceof Error ? secondError.message : 'unknown'}`
-          );
+        const isAuthError =
+          firstError instanceof ApiError &&
+          (firstError.code === 'token_invalid' || firstError.code === 'token_reuse_detected');
+
+        if (!isAuthError) {
+          // Network/server error — retry once after a short pause.
+          try {
+            await wait(350);
+            await refreshSession();
+          } catch (secondError) {
+            noteAuthBreadcrumb(
+              `refresh retry failed on boot: ${secondError instanceof Error ? secondError.message : 'unknown'}`
+            );
+            const isAuthError2 =
+              secondError instanceof ApiError &&
+              (secondError.code === 'token_invalid' || secondError.code === 'token_reuse_detected');
+            // Only clear the session for definitive auth rejections, not network errors.
+            if (isAuthError2) {
+              useAuthStore.getState().clearSession();
+            }
+            // If it's a network error the user stays "logged in" in the UI;
+            // the silent-refresh timer or visibilitychange will retry later.
+          }
+        } else {
           useAuthStore.getState().clearSession();
         }
       } finally {
-        if (active) {
-          setBootStatus('ready');
-        }
+        if (active) setBootStatus('ready');
       }
     };
 
     void boot();
 
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, []);
 
+  // Re-schedule silent refresh whenever the token changes.
   useEffect(() => {
     if (accessToken) {
       scheduleSilentRefresh(expiresAt);
     }
   }, [accessToken, expiresAt]);
+
+  // Proactive refresh when the user comes back to the tab / app after a pause.
+  // This is the main guard against iOS background killing the setTimeout.
+  useEffect(() => {
+    const tryRefresh = () => {
+      if (!useAuthStore.getState().accessToken) return;
+      if (!isTokenExpiredOrMissing(useAuthStore.getState().expiresAt)) return;
+      noteAuthBreadcrumb('proactive refresh on visibility/focus');
+      void refreshSession().catch(() => {
+        // silent — the next API call will get a 401 and re-trigger refresh
+      });
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') tryRefresh();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', tryRefresh);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', tryRefresh);
+    };
+  }, []);
 
   const isLoggedIn = bootStatus === 'ready' && !!accessToken;
 

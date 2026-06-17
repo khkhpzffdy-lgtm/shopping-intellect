@@ -6,7 +6,7 @@ let refreshPromise: Promise<AuthEnvelope> | null = null;
 
 const AUTH_HANDOFF_KEY = 'si_auth_handoff_v1';
 const AUTH_BREADCRUMBS_KEY = 'si_auth_breadcrumbs_v1';
-const AUTH_HANDOFF_TTL_MS = 2 * 60 * 1000;
+const AUTH_HANDOFF_TTL_MS = 10 * 60 * 1000;
 
 const decodeBase64Url = (value: string) => {
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/');

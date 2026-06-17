@@ -24,6 +24,7 @@ import {
   type ListItemView,
   type ShoppingListRecord
 } from '../storage/db';
+import { AddSearchScreen } from './AddSearchScreen';
 import { ListsScreen } from './ListsScreen';
 import { ListScreen } from './ListScreen';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -51,12 +52,7 @@ const formatActionError = (error: unknown, fallback: string) => {
   return fallback;
 };
 
-type HomeScreenProps = {
-  onOpenAddSearch: (list: ShoppingListRecord) => void;
-  onItemAdded: () => void;
-};
-
-export const HomeScreen = ({ onOpenAddSearch, onItemAdded }: HomeScreenProps) => {
+export const HomeScreen = () => {
   const user = useAuthStore((state) => state.user);
   const theme = useThemeStore((state) => state.theme);
   const setTheme = useThemeStore((state) => state.setTheme);
@@ -68,6 +64,7 @@ export const HomeScreen = ({ onOpenAddSearch, onItemAdded }: HomeScreenProps) =>
   const [createName, setCreateName] = useState('');
   const [draft, setDraft] = useState({ term: '', quantity: '', unit: '' });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [addSearchOpen, setAddSearchOpen] = useState(false);
   const selectedListKeyRef = useRef<string | null>(null);
 
   selectedListKeyRef.current = selectedListKey;
@@ -411,7 +408,7 @@ export const HomeScreen = ({ onOpenAddSearch, onItemAdded }: HomeScreenProps) =>
             onDraftChange={(field, value) => setDraft((current) => ({ ...current, [field]: value }))}
             onBack={() => setSelectedListKey(null)}
             onAddItem={handleAddItem}
-            onOpenAddSearch={() => onOpenAddSearch(selectedList)}
+            onOpenAddSearch={() => setAddSearchOpen(true)}
             onToggleChecked={handleToggleChecked}
             onRemoveItem={handleRemoveItem}
           />
@@ -431,6 +428,38 @@ export const HomeScreen = ({ onOpenAddSearch, onItemAdded }: HomeScreenProps) =>
           />
         )}
       </div>
+
+      {selectedList && addSearchOpen ? (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'var(--bg)',
+            zIndex: 50,
+            overflowY: 'auto'
+          }}
+          className="px-4 py-6 md:px-8"
+        >
+          <div className="mx-auto max-w-3xl space-y-4">
+            <div className="appbar">
+              <button
+                type="button"
+                onClick={() => setAddSearchOpen(false)}
+                className="iconbtn"
+                aria-label="Затвори"
+              >
+                ←
+              </button>
+              <div className="appbar__title">{selectedList.name}</div>
+            </div>
+            <AddSearchScreen
+              selectedList={selectedList}
+              onItemAdded={() => setAddSearchOpen(false)}
+              isActive={addSearchOpen}
+            />
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 };

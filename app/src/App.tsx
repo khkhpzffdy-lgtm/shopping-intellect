@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { loginWithGoogle } from './api/client';
 import { ApiError } from './api/session';
-import type { ShoppingListRecord } from './storage/db';
 import {
   applyAuthEnvelope,
   consumeAuthHandoff,
@@ -18,12 +17,12 @@ import { useThemeStore } from './store/theme';
 import { AuthScreen } from './components/AuthScreen';
 import { HomeScreen } from './components/HomeScreen';
 import { BottomNav } from './components/BottomNav';
-import { AddSearchScreen } from './components/AddSearchScreen';
+import { CatalogScreen } from './components/CatalogScreen';
 import { SkeletonLoader } from './components/SkeletonLoader';
 import { OfflineBanner } from './components/OfflineBanner';
 
 type BootStatus = 'booting' | 'ready';
-type ActiveTab = 'lists' | 'add';
+type ActiveTab = 'lists' | 'catalog';
 
 const isTokenExpiredOrMissing = (expiresAt: number | null) =>
   expiresAt === null || Date.now() >= expiresAt - 30_000;
@@ -34,7 +33,6 @@ export default function App() {
   const [bootStatus, setBootStatus] = useState<BootStatus>('booting');
   const [authError, setAuthError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('lists');
-  const [selectedListRecord, setSelectedListRecord] = useState<ShoppingListRecord | null>(null);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const accessToken = useAuthStore((state) => state.accessToken);
   const expiresAt = useAuthStore((state) => state.expiresAt);
@@ -222,20 +220,10 @@ export default function App() {
       {isLoggedIn ? (
         <>
           <div style={{ display: activeTab === 'lists' ? 'block' : 'none' }}>
-            <HomeScreen
-              onOpenAddSearch={(list) => {
-                setSelectedListRecord(list);
-                setActiveTab('add');
-              }}
-              onItemAdded={() => {}}
-            />
+            <HomeScreen />
           </div>
-          <div style={{ display: activeTab === 'add' ? 'block' : 'none' }} className="px-4 py-4 md:px-8">
-            <AddSearchScreen
-              selectedList={selectedListRecord}
-              onItemAdded={() => setActiveTab('lists')}
-              isActive={activeTab === 'add'}
-            />
+          <div style={{ display: activeTab === 'catalog' ? 'block' : 'none' }} className="px-4 py-4 md:px-8">
+            <CatalogScreen isActive={activeTab === 'catalog'} />
           </div>
           {isInputFocused ? null : <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />}
         </>

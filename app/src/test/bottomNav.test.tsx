@@ -7,16 +7,16 @@ describe('BottomNav', () => {
   test('renders both tabs', () => {
     render(<BottomNav activeTab="lists" onTabChange={() => {}} />);
     expect(screen.getByText('Списъци')).toBeInTheDocument();
-    expect(screen.getByText('Добавяне')).toBeInTheDocument();
+    expect(screen.getByText('Каталог')).toBeInTheDocument();
   });
 
   test('marks active tab with aria-current', () => {
     const { rerender } = render(<BottomNav activeTab="lists" onTabChange={() => {}} />);
     expect(screen.getByText('Списъци').closest('button')).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByText('Добавяне').closest('button')).not.toHaveAttribute('aria-current');
+    expect(screen.getByText('Каталог').closest('button')).not.toHaveAttribute('aria-current');
 
-    rerender(<BottomNav activeTab="add" onTabChange={() => {}} />);
-    expect(screen.getByText('Добавяне').closest('button')).toHaveAttribute('aria-current', 'page');
+    rerender(<BottomNav activeTab="catalog" onTabChange={() => {}} />);
+    expect(screen.getByText('Каталог').closest('button')).toHaveAttribute('aria-current', 'page');
     expect(screen.getByText('Списъци').closest('button')).not.toHaveAttribute('aria-current');
   });
 
@@ -24,8 +24,8 @@ describe('BottomNav', () => {
     const onTabChange = vi.fn();
     render(<BottomNav activeTab="lists" onTabChange={onTabChange} />);
 
-    await userEvent.click(screen.getByText('Добавяне').closest('button')!);
-    expect(onTabChange).toHaveBeenCalledWith('add');
+    await userEvent.click(screen.getByText('Каталог').closest('button')!);
+    expect(onTabChange).toHaveBeenCalledWith('catalog');
 
     await userEvent.click(screen.getByText('Списъци').closest('button')!);
     expect(onTabChange).toHaveBeenCalledWith('lists');

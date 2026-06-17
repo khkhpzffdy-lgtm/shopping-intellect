@@ -663,6 +663,43 @@ test('opening a list pulls its items from the server when local IndexedDB has no
   expect(await screen.findByText('кашкавал')).toBeInTheDocument();
 });
 
+test('the 🔍 button opens Add/Search as an overlay on the list and closing it returns to the same list', async () => {
+  useAuthStore.getState().setSession({
+    accessToken: makeToken({ user_id: 14, family_ids: [], display_name: 'Yana' }),
+    expiresIn: 900,
+    user: { id: 14, displayName: 'Yana', familyIds: [] }
+  });
+
+  Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+
+  mockFetch.mockImplementation(() =>
+    Promise.resolve(
+      new Response(JSON.stringify({ auth: { access_token: makeToken({ user_id: 14, family_ids: [], display_name: 'Yana' }), expires_in: 900 } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    )
+  );
+
+  renderApp();
+
+  await screen.findByText('Все още нямаш списъци');
+  await userEvent.click(screen.getByRole('button', { name: 'New list' }));
+  await userEvent.type(screen.getByLabelText('List name'), 'Search overlay test');
+  await userEvent.click(screen.getAllByRole('button', { name: 'Създай списък' })[0]);
+  await userEvent.click(await screen.findByRole('button', { name: /Search overlay test/i }));
+
+  await userEvent.click(screen.getByRole('button', { name: 'Search' }));
+
+  expect(await screen.findByLabelText('Търси термин')).toBeInTheDocument();
+  expect(screen.getByLabelText('Item term')).toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole('button', { name: 'Затвори' }));
+
+  expect(screen.queryByLabelText('Търси термин')).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Item term')).toBeInTheDocument();
+});
+
 test('boot offline (GET /lists rejects) still renders local-first data without an error', async () => {
   useAuthStore.getState().setSession({
     accessToken: makeToken({ user_id: 12, family_ids: [], display_name: 'Stoyan' }),

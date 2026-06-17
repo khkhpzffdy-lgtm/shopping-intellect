@@ -1,4 +1,4 @@
-type Tab = 'lists' | 'add';
+type Tab = 'lists' | 'catalog';
 
 type BottomNavProps = {
   activeTab: Tab;
@@ -18,12 +18,12 @@ export const BottomNav = ({ activeTab, onTabChange }: BottomNavProps) => (
     </button>
     <button
       type="button"
-      className={`bottomnav__tab${activeTab === 'add' ? ' bottomnav__tab--active' : ''}`}
-      onClick={() => onTabChange('add')}
-      aria-current={activeTab === 'add' ? 'page' : undefined}
+      className={`bottomnav__tab${activeTab === 'catalog' ? ' bottomnav__tab--active' : ''}`}
+      onClick={() => onTabChange('catalog')}
+      aria-current={activeTab === 'catalog' ? 'page' : undefined}
     >
-      <span className="bottomnav__icon" aria-hidden="true">+</span>
-      <span className="bottomnav__label">Добавяне</span>
+      <span className="bottomnav__icon" aria-hidden="true">📦</span>
+      <span className="bottomnav__label">Каталог</span>
     </button>
   </nav>
 );

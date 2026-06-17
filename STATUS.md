@@ -119,6 +119,7 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 | §2.2 | Lists end-to-end (backend + frontend) | ✅ done |
 | §2.2c | Visual redesign of Lists overview + List screen to match `design/screens2.jsx` | ✅ done |
 | §2.3 | Offline mutation flush/retry engine (durable reconnect sync, drains `mutation_queue`) | ✅ done |
+| §3.1 | `HttpClient` interface + `WpHttpClient` + `AbstractCrawler` + `LidlCrawler` stub + `RawOffer` DTO + `bin/crawl.php` | ✅ done |
 
 **App (`app/`):** Vite + React PWA, FTP deploy wired. Implemented so far:
 - `AuthScreen` — register/login screen, working against the plugin's auth endpoints
@@ -217,9 +218,7 @@ above. Pushed to `main` (`be211c9`), CI build+deploy green. Owner verification o
 shopping.flux.bg of §2.3's reconnect-drain acceptance criteria (and the still-
 pending §2.2c criteria) is outstanding.
 
-**Next up: §3.1 — `HttpClient` interface + `WpHttpClient` + `AbstractCrawler`**
-(crawler base in the plugin repo: fetch via injected `HttpClient`, parse with
-built-in DOM/XPath, emit `RawOffer` DTOs — backend-only, no app/screen changes).
+**Next up: §3.2** — `IngestionService` (validate, categorize, persist `RawOffer` DTOs to DB).
 
 **Build order (2026-06-15 re-sequencing, see `13-implementation-line.md`
 "Re-sequencing" note above M3):** §2.3 (done) → **§3.1 (next)** → §3.2 → §3.3

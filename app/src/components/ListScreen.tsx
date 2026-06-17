@@ -45,6 +45,9 @@ export const ListScreen = ({
           ←
         </button>
         <div className="appbar__title">{list.name}</div>
+        <button type="button" onClick={onOpenAddSearch} className="iconbtn" aria-label="Search">
+          🔍
+        </button>
         <SyncStatusIndicator
           pending={mutationStatusCounts[list.client_uuid]?.pending ?? 0}
           failed={mutationStatusCounts[list.client_uuid]?.failed ?? 0}
@@ -91,7 +94,7 @@ export const ListScreen = ({
           aria-label="Item unit"
           value={draft.unit}
           onChange={(event) => onDraftChange('unit', event.target.value)}
-          placeholder="piece"
+          placeholder="бр."
           className="addbar__field"
           style={{ flex: '0 0 64px' }}
         />
@@ -108,7 +111,7 @@ export const ListScreen = ({
             className="p-6"
             style={{ background: 'var(--card)', borderRadius: 'var(--radius)', border: '1px solid var(--card-border)' }}
           >
-            <p style={{ color: 'var(--ink-2)', fontSize: 'var(--fs-body)' }}>This list is empty for now.</p>
+            <p style={{ color: 'var(--ink-2)', fontSize: 'var(--fs-body)' }}>Този списък все още е празен.</p>
           </section>
         ) : null}
 
@@ -128,7 +131,7 @@ export const ListScreen = ({
                 failed={mutationStatusCounts[item.client_uuid]?.failed ?? 0}
               />
               <button type="button" onClick={() => onRemoveItem(item)} className="git__remove">
-                Remove
+                Премахни
               </button>
             </article>
           ) : (
@@ -160,7 +163,7 @@ export const ListScreen = ({
                 failed={mutationStatusCounts[item.client_uuid]?.failed ?? 0}
               />
               <button type="button" onClick={() => onRemoveItem(item)} className="git__remove">
-                Remove
+                Премахни
               </button>
             </article>
           )

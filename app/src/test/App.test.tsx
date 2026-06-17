@@ -61,7 +61,7 @@ test('boot 401 shows the auth screen', async () => {
   renderApp();
 
   expect(await screen.findByLabelText('Email')).toBeInTheDocument();
-  expect(screen.queryByText('No lists yet')).not.toBeInTheDocument();
+  expect(screen.queryByText('Все още нямаш списъци')).not.toBeInTheDocument();
 });
 
 test('defaults to the dark theme with no stored preference', async () => {
@@ -91,7 +91,7 @@ test('boot 200 shows lists overview and keeps token out of storage', async () =>
 
   renderApp();
 
-  expect(await screen.findByText('No lists yet')).toBeInTheDocument();
+  expect(await screen.findByText('Все още нямаш списъци')).toBeInTheDocument();
   expect(useAuthStore.getState().accessToken).toBe(accessToken);
   expect(localStorage.length).toBe(0);
   expect(sessionStorage.length).toBe(0);
@@ -114,7 +114,7 @@ test('boot restores a recent auth handoff without calling refresh first', async 
 
   renderApp();
 
-  expect(await screen.findByText('No lists yet')).toBeInTheDocument();
+  expect(await screen.findByText('Все още нямаш списъци')).toBeInTheDocument();
   expect(useAuthStore.getState().accessToken).toBe(accessToken);
   expect(mockFetch).not.toHaveBeenCalled();
 });
@@ -141,7 +141,7 @@ test('boot retries refresh once before logging out', async () => {
 
   await vi.advanceTimersByTimeAsync(400);
 
-  expect(await screen.findByText('No lists yet')).toBeInTheDocument();
+  expect(await screen.findByText('Все още нямаш списъци')).toBeInTheDocument();
   expect(mockFetch).toHaveBeenCalledTimes(2);
   vi.useRealTimers();
 });
@@ -187,7 +187,7 @@ test('login success shows lists overview and invalid credentials stay on auth', 
   await userEvent.type(passwordInput, 'good-pass');
   await userEvent.click(screen.getByRole('button', { name: 'Submit log in' }));
 
-  expect(await screen.findByText('No lists yet')).toBeInTheDocument();
+  expect(await screen.findByText('Все още нямаш списъци')).toBeInTheDocument();
 });
 
 test('register success shows home', async () => {
@@ -220,7 +220,7 @@ test('register success shows home', async () => {
   await userEvent.type(screen.getByLabelText('Password'), 'secret123');
   await userEvent.click(screen.getByRole('button', { name: 'Submit registration' }));
 
-  expect(await screen.findByText('No lists yet')).toBeInTheDocument();
+  expect(await screen.findByText('Все още нямаш списъци')).toBeInTheDocument();
 });
 
 test('creating a list shows it immediately and persists across remount', async () => {
@@ -243,9 +243,9 @@ test('creating a list shows it immediately and persists across remount', async (
 
   const view = renderApp();
 
-  await screen.findByText('No lists yet');
+  await screen.findByText('Все още нямаш списъци');
   await userEvent.type(screen.getByLabelText('List name'), 'Weekly groceries');
-  await userEvent.click(screen.getByRole('button', { name: 'Create list' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Създай списък' }));
 
   expect(await screen.findByRole('button', { name: /Weekly groceries/i })).toBeInTheDocument();
 
@@ -275,18 +275,18 @@ test('adding, toggling, removing, and reloading items stays local-first', async 
 
   const view = renderApp();
 
-  await screen.findByText('No lists yet');
+  await screen.findByText('Все още нямаш списъци');
   await userEvent.type(screen.getByLabelText('List name'), 'Weekend');
-  await userEvent.click(screen.getByRole('button', { name: 'Create list' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Създай списък' }));
   await userEvent.click(await screen.findByRole('button', { name: /Weekend/i }));
 
   await userEvent.type(screen.getByLabelText('Item term'), 'мляко');
   await userEvent.type(screen.getByLabelText('Item quantity'), '2');
-  await userEvent.type(screen.getByLabelText('Item unit'), 'piece');
+  await userEvent.type(screen.getByLabelText('Item unit'), 'бр.');
   await userEvent.click(screen.getByRole('button', { name: 'Add item' }));
 
   expect(await screen.findByText('мляко')).toBeInTheDocument();
-  expect(screen.getByText('2 piece')).toBeInTheDocument();
+  expect(screen.getByText('2 бр.')).toBeInTheDocument();
 
   await userEvent.click(screen.getByRole('button', { name: 'shopping' }));
   const checklistRow = await screen.findByRole('button', { name: /мляко/i });
@@ -306,7 +306,7 @@ test('adding, toggling, removing, and reloading items stays local-first', async 
 
   await userEvent.click(screen.getByRole('button', { name: 'shopping' }));
   expect(await screen.findByRole('button', { name: /мляко/i })).toHaveAttribute('aria-pressed', 'true');
-  await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Премахни' }));
   await waitFor(() => {
     expect(screen.queryByText('мляко')).not.toBeInTheDocument();
   });
@@ -335,10 +335,10 @@ test('adding an item to a list whose create-list mutation has not resolved still
 
   renderApp();
 
-  await screen.findByText('No lists yet');
+  await screen.findByText('Все още нямаш списъци');
   await userEvent.click(screen.getByRole('button', { name: 'New list' }));
   await userEvent.type(screen.getByLabelText('List name'), 'Pending list');
-  await userEvent.click(screen.getByRole('button', { name: 'Create list' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Създай списък' }));
 
   await userEvent.click(await screen.findByRole('button', { name: /Pending list/i }));
   await userEvent.type(screen.getByLabelText('Item term'), 'мляко');
@@ -367,20 +367,20 @@ test('creating a list and adding an item while offline does not surface an error
 
   renderApp();
 
-  await screen.findByText('No lists yet');
+  await screen.findByText('Все още нямаш списъци');
   await userEvent.click(screen.getByRole('button', { name: 'New list' }));
   await userEvent.type(screen.getByLabelText('List name'), 'Offline list');
-  await userEvent.click(screen.getByRole('button', { name: 'Create list' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Създай списък' }));
 
   expect(await screen.findByRole('button', { name: /Offline list/i })).toBeInTheDocument();
-  expect(screen.queryByText(/Could not create the list/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Списъкът не може да се създаде/i)).not.toBeInTheDocument();
 
   await userEvent.click(screen.getByRole('button', { name: /Offline list/i }));
   await userEvent.type(screen.getByLabelText('Item term'), 'мляко');
   await userEvent.click(screen.getByRole('button', { name: 'Add item' }));
 
   expect(await screen.findByText('мляко')).toBeInTheDocument();
-  expect(screen.queryByText(/Could not add the item/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Продуктът не може да се добави/i)).not.toBeInTheDocument();
 });
 
 test('mode toggle switches between planning and shopping rendering', async () => {
@@ -403,9 +403,9 @@ test('mode toggle switches between planning and shopping rendering', async () =>
 
   renderApp();
 
-  await screen.findByText('No lists yet');
+  await screen.findByText('Все още нямаш списъци');
   await userEvent.type(screen.getByLabelText('List name'), 'Switch test');
-  await userEvent.click(screen.getByRole('button', { name: 'Create list' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Създай списък' }));
   await userEvent.click(await screen.findByRole('button', { name: /Switch test/i }));
   await userEvent.type(screen.getByLabelText('Item term'), 'ябълки');
   await userEvent.click(screen.getByRole('button', { name: 'Add item' }));
@@ -475,7 +475,7 @@ test('logout clears the store and returns to auth', async () => {
 
   renderApp();
 
-  await screen.findByText('No lists yet');
+  await screen.findByText('Все още нямаш списъци');
   await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
 
   await waitFor(() => {

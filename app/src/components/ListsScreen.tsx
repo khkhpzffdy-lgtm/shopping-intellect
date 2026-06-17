@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ShoppingListRecord } from '../storage/db';
+import { EmptyState } from './EmptyState';
 import { SyncStatusIndicator } from './SyncStatusIndicator';
 
 type ListsScreenProps = {
@@ -122,7 +123,7 @@ export const ListsScreen = ({
             onClick={submitCreate}
             style={{ color: 'var(--accent)', fontSize: 'var(--fs-sm)', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer' }}
           >
-            Create list
+            Създай списък
           </button>
         ) : null}
       </div>
@@ -133,17 +134,7 @@ export const ListsScreen = ({
         </p>
       ) : null}
 
-      {lists.length === 0 ? (
-        <section
-          className="p-8"
-          style={{ background: 'var(--card)', borderRadius: 'var(--radius)', border: '1px solid var(--card-border)', boxShadow: 'var(--shadow)' }}
-        >
-          <h2 style={{ color: 'var(--ink)', fontSize: 'var(--fs-display)', fontWeight: 600 }}>No lists yet</h2>
-          <p className="mt-3 max-w-xl" style={{ color: 'var(--ink-2)', fontSize: 'var(--fs-body)', lineHeight: 1.6 }}>
-            Започни с име по-горе и първият ти списък ще се появи веднага, дори офлайн.
-          </p>
-        </section>
-      ) : null}
+      {lists.length === 0 ? <EmptyState context="no-lists" onCreate={() => setCreating(true)} /> : null}
 
       <div className="grid gap-3">
         {lists.map((list) => (

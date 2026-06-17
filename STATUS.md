@@ -124,6 +124,7 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 | §3.1 | `HttpClient` interface + `WpHttpClient` + `AbstractCrawler` + `LidlCrawler` stub + `RawOffer` DTO + `bin/crawl.php` | ✅ done |
 | §4.0 | Navigation shell + Add/Search screen (`BottomNav`, `AddSearchScreen`, `App.tsx` tab state, `HomeScreen`/`ListScreen` wired) | ✅ done |
 | §2.3c | `SyncStatusIndicator` icon-only redesign + offline banner (supersedes §2.2d item 1) | ✅ done |
+| §2.2d | UI consistency cleanup: `EmptyState` wired + translated, one-language copy pass, list-screen search icon → Add/Search | ✅ done |
 
 **App (`app/`):** Vite + React PWA, FTP deploy wired. Implemented so far:
 - `AuthScreen` — register/login screen, working against the plugin's auth endpoints
@@ -278,11 +279,31 @@ above. Pushed to `main` (`be211c9`), CI build+deploy green. Owner verification o
 shopping.flux.bg of §2.3's reconnect-drain acceptance criteria (and the still-
 pending §2.2c criteria) is outstanding.
 
-**Next up: §2.2d** (remaining items 2-4 only — item 1 is done via §2.3c). **Owner-confirmed
-2026-06-17** to run before §3.2.
+**§2.2d is done (2026-06-17).** Items 2-4 shipped (item 1 was already covered by §2.3c):
+`EmptyState` now takes an `onCreate` prop wired to `ListsScreen`'s create flow (the
+"Create list" CTA was previously a dead button); `ListsScreen` renders the shared
+`EmptyState` instead of an inline duplicate; the listed English strings in
+`ListScreen.tsx`/`EmptyState.tsx`/`HomeScreen.tsx` are now Bulgarian (item placeholders,
+"Remove" → "Премахни", empty-state copy, the two `formatActionError` fallbacks);
+`ListScreen.tsx`'s appbar gained a 🔍 `iconbtn` wired to the existing (previously dead)
+`onOpenAddSearch` prop, matching `design/screens2.jsx`'s search icon and the bottom nav's
+"Добавяне" destination. `aria-label`s and Vitest selectors were left untouched except
+where a test asserted on now-translated *visible* text (`App.test.tsx`'s `'No lists yet'`
+→ `'Все още нямаш списъци'`, `'Create list'`/`'Remove'` button names, the `piece` unit
+value, and the two `formatActionError` negative-text assertions) — same approach as
+§2.2c/§2.3c. Verified with a headless-Chromium script driving the real built app against
+mocked `/auth`/`/lists` routes (no project run-skill existed for this app, so a one-off
+Playwright script was used): EmptyState CTA now reveals the create-list input, the list
+screen shows the 🔍 icon and clicking it opens Add/Search, and copy renders in Bulgarian
+throughout. `npx tsc --noEmit` and `npm run build` both pass. The four already-flaky test
+files (`App.test.tsx`, `flush.test.ts`, `sendMutation.test.ts`, `addSearch.test.tsx`) noted
+in the §2.3c entry above are still flaky in this sandbox for the same pre-existing,
+environment-specific reasons (confirmed again via `git stash` on this session) — all other
+test files (`bottomNav`, `offlineBanner`, `syncStatusIndicator`, `theme`, `db`,
+`connectivity`) pass clean. Not yet pushed to `main` — see note below.
 
 **Build order (2026-06-17, revised same day):** §3.1 (done) → §4.0 (done) → §2.3a (done) → §2.3b (done) → §2.3c (done)
-→ **§2.2d (items 2-4, confirmed next)** → §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 (Family) → §2.5 (Favorites) → M5.
+→ **§2.2d (done)** → §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 (Family) → §2.5 (Favorites) → M5.
 Rationale: §4.0 is pure frontend with no DB dependency. §3.2/§3.3 (ingestion + cron) follow
 immediately so real offers are in the DB before §4.1 ships — the Owner sees real prices from
 day one, not empty state. §2.3a/§2.3b/§2.3c jumped the queue ahead of §2.2d same day — see incident

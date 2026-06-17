@@ -196,7 +196,7 @@ export const HomeScreen = ({ onOpenAddSearch, onItemAdded }: HomeScreenProps) =>
       }
     } catch (error) {
       setErrorMessage(
-        formatActionError(error, 'Could not create the list on this device yet. Please try again.')
+        formatActionError(error, 'Списъкът не може да се създаде на това устройство все още. Опитай отново.')
       );
     }
   };
@@ -272,7 +272,7 @@ export const HomeScreen = ({ onOpenAddSearch, onItemAdded }: HomeScreenProps) =>
       }
     } catch (error) {
       setErrorMessage(
-        formatActionError(error, 'Could not add the item on this device yet. Please try again.')
+        formatActionError(error, 'Продуктът не може да се добави на това устройство все още. Опитай отново.')
       );
     }
   };

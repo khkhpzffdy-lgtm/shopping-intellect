@@ -141,6 +141,11 @@ export const deleteListItem = async (clientUuid: string) => {
   await db.delete('list_items', clientUuid);
 };
 
+export const getAllUserProducts = async (): Promise<UserProductRecord[]> => {
+  const db = await getDb();
+  return db.getAll('user_products');
+};
+
 export const getUserProductByTerm = async (term: string, ownerId: number) => {
   const db = await getDb();
   const normalizedTerm = normalizeTerm(term);

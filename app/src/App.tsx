@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { loginWithGoogle } from './api/client';
 import { ApiError } from './api/session';
+import type { ShoppingListRecord } from './storage/db';
 import {
   applyAuthEnvelope,
   consumeAuthHandoff,
@@ -16,15 +17,20 @@ import { useAuthStore } from './store/auth';
 import { useThemeStore } from './store/theme';
 import { AuthScreen } from './components/AuthScreen';
 import { HomeScreen } from './components/HomeScreen';
+import { BottomNav } from './components/BottomNav';
+import { AddSearchScreen } from './components/AddSearchScreen';
 import { SkeletonLoader } from './components/SkeletonLoader';
 
 type BootStatus = 'booting' | 'ready';
+type ActiveTab = 'lists' | 'add';
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 export default function App() {
   const [bootStatus, setBootStatus] = useState<BootStatus>('booting');
   const [authError, setAuthError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<ActiveTab>('lists');
+  const [selectedListRecord, setSelectedListRecord] = useState<ShoppingListRecord | null>(null);
   const accessToken = useAuthStore((state) => state.accessToken);
   const expiresAt = useAuthStore((state) => state.expiresAt);
   const theme = useThemeStore((state) => state.theme);
@@ -136,11 +142,37 @@ export default function App() {
     }
   }, [accessToken, expiresAt]);
 
+  const isLoggedIn = bootStatus === 'ready' && !!accessToken;
+
   return (
-    <div className="si-root min-h-screen px-4 py-6 md:px-8" data-theme={theme}>
-      {bootStatus === 'booting' ? <SkeletonLoader shape="card" /> : null}
-      {bootStatus === 'ready' && !accessToken ? <AuthScreen initialError={authError} /> : null}
-      {bootStatus === 'ready' && accessToken ? <HomeScreen /> : null}
+    <div className="si-root min-h-screen" data-theme={theme} style={{ paddingBottom: isLoggedIn ? 64 : 0 }}>
+      {bootStatus === 'booting' ? (
+        <div className="px-4 py-6 md:px-8"><SkeletonLoader shape="card" /></div>
+      ) : null}
+      {bootStatus === 'ready' && !accessToken ? (
+        <div className="px-4 py-6 md:px-8"><AuthScreen initialError={authError} /></div>
+      ) : null}
+      {isLoggedIn ? (
+        <>
+          <div style={{ display: activeTab === 'lists' ? 'block' : 'none' }}>
+            <HomeScreen
+              onOpenAddSearch={(list) => {
+                setSelectedListRecord(list);
+                setActiveTab('add');
+              }}
+              onItemAdded={() => {}}
+            />
+          </div>
+          <div style={{ display: activeTab === 'add' ? 'block' : 'none' }} className="px-4 py-4 md:px-8">
+            <AddSearchScreen
+              selectedList={selectedListRecord}
+              onItemAdded={() => setActiveTab('lists')}
+              isActive={activeTab === 'add'}
+            />
+          </div>
+          <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+        </>
+      ) : null}
     </div>
   );
 }

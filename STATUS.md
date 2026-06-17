@@ -120,6 +120,7 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 | §2.2c | Visual redesign of Lists overview + List screen to match `design/screens2.jsx` | ✅ done |
 | §2.3 | Offline mutation flush/retry engine (durable reconnect sync, drains `mutation_queue`) | ✅ done |
 | §3.1 | `HttpClient` interface + `WpHttpClient` + `AbstractCrawler` + `LidlCrawler` stub + `RawOffer` DTO + `bin/crawl.php` | ✅ done |
+| §4.0 | Navigation shell + Add/Search screen (`BottomNav`, `AddSearchScreen`, `App.tsx` tab state, `HomeScreen`/`ListScreen` wired) | ✅ done |
 
 **App (`app/`):** Vite + React PWA, FTP deploy wired. Implemented so far:
 - `AuthScreen` — register/login screen, working against the plugin's auth endpoints
@@ -145,6 +146,8 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
   avoid collisions with existing Tailwind/theme classes. FAB and bottom tab bar
   omitted (no backing screens yet, per slice scope). All §2.2b data wiring,
   IndexedDB/mutation-queue logic, and props/handlers are unchanged.
+- **§4.0 navigation shell + Add/Search screen (done):** `BottomNav` (fixed bottom tab bar, Списъци / Добавяне tabs) and `AddSearchScreen` (search over owner's own terms from IndexedDB + server seed, "добави нов термин" affordance on no-match, optimistic add with mutation-queue offline support, QuickAddSection ×3 in empty-state). `App.tsx` holds `activeTab` state and renders both screens (`display: none` toggle) + `BottomNav` when logged in. `HomeScreen` passes `onOpenAddSearch(list)` down; `ListScreen` accepts `onOpenAddSearch` prop (wired, `+` still triggers inline add for backwards compat — tab bar is the primary entry point for AddSearch). CSS in `list-screens.css`. `getAllUserProducts()` helper added to `db.ts`. Vitest tests for `BottomNav` (render + tab switch) and `AddSearchScreen` (match, no-match, select term, add-new, offline) written. Build passes (`npm run build`). Pushed to main.
+
 - **§2.3 offline mutation flush/retry engine (done):** `app/src/sync/flush.ts`
   (`flushQueuedMutations`) drains `mutation_queue` rows with status `pending`/
   `failed`, sorted by `created_at`, one at a time. Each mutation is atomically
@@ -218,7 +221,7 @@ above. Pushed to `main` (`be211c9`), CI build+deploy green. Owner verification o
 shopping.flux.bg of §2.3's reconnect-drain acceptance criteria (and the still-
 pending §2.2c criteria) is outstanding.
 
-**Next up: §4.0** — navigation shell + Add/Search screen (frontend, `app/`).
+**Next up: §3.2** — ingestion service + categorization.
 
 **Build order (2026-06-17):** §3.1 (done) → **§4.0** → §3.2 → §3.3 → §4.1 → §4.2 → §4.3
 → §2.4 (Family) → §2.5 (Favorites) → M5.

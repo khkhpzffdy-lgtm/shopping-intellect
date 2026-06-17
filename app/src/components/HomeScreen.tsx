@@ -50,7 +50,12 @@ const formatActionError = (error: unknown, fallback: string) => {
   return fallback;
 };
 
-export const HomeScreen = () => {
+type HomeScreenProps = {
+  onOpenAddSearch: (list: ShoppingListRecord) => void;
+  onItemAdded: () => void;
+};
+
+export const HomeScreen = ({ onOpenAddSearch, onItemAdded }: HomeScreenProps) => {
   const user = useAuthStore((state) => state.user);
   const theme = useThemeStore((state) => state.theme);
   const setTheme = useThemeStore((state) => state.setTheme);
@@ -435,6 +440,7 @@ export const HomeScreen = () => {
             onDraftChange={(field, value) => setDraft((current) => ({ ...current, [field]: value }))}
             onBack={() => setSelectedListKey(null)}
             onAddItem={handleAddItem}
+            onOpenAddSearch={() => onOpenAddSearch(selectedList)}
             onToggleChecked={handleToggleChecked}
             onRemoveItem={handleRemoveItem}
           />

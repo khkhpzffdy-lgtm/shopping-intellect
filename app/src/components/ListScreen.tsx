@@ -14,6 +14,7 @@ type ListScreenProps = {
   onDraftChange: (field: 'term' | 'quantity' | 'unit', value: string) => void;
   onBack: () => void;
   onAddItem: () => void;
+  onOpenAddSearch: () => void;
   onToggleChecked: (item: ListItemView) => void;
   onRemoveItem: (item: ListItemView) => void;
 };
@@ -36,6 +37,7 @@ export const ListScreen = ({
   onDraftChange,
   onBack,
   onAddItem,
+  onOpenAddSearch,
   onToggleChecked,
   onRemoveItem
 }: ListScreenProps) => {

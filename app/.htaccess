@@ -3,6 +3,13 @@
 RewriteEngine On
 RewriteBase /
 
+# This host's PHP runtime strips the Authorization header before it reaches
+# PHP (common on FastCGI/PHP-FPM-via-Apache setups), which broke every JWT
+# bearer-auth request (si/v1 list/item endpoints) with "Missing bearer token".
+# Forward it explicitly.
+RewriteCond %{HTTP:Authorization} ^(.+)
+RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
 # Serve existing WordPress/app files and directories as-is
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d

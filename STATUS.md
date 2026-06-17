@@ -126,6 +126,7 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 | §2.3c | `SyncStatusIndicator` icon-only redesign + offline banner (supersedes §2.2d item 1) | ✅ done |
 | §2.2d | UI consistency cleanup: `EmptyState` wired + translated, one-language copy pass, list-screen search icon → Add/Search | ✅ done |
 | §2.3d | Pull lists/items from server on boot — fixes "different browsers, same account, different lists" | ✅ done |
+| §4.0b | Catalog tab + move Add/Search off the bottom nav | ✅ done |
 
 **App (`app/`):** Vite + React PWA, FTP deploy wired. Implemented so far:
 - `AuthScreen` — register/login screen, working against the plugin's auth endpoints
@@ -348,8 +349,52 @@ timeouts, noted in the §2.3c and §2.2d entries above) persists — unrelated t
 slice's changes; the unaffected test files (`bottomNav`, `offlineBanner`,
 `syncStatusIndicator`, `theme`, `db`, `connectivity`) all pass clean.
 
+**§4.0b is done (2026-06-18).** Bottom nav holds only browse destinations now: `BottomNav`'s
+`'add'` tab is replaced with `'catalog'` (label "Каталог", 📦 icon); `Tab`/`ActiveTab` types
+are `'lists' | 'catalog'`. **Backend (plugin repo, pushed to `main`, `a946388`):** new
+`Models/Category.php` (id/slug/name only — `is_seeded`/`replaced_by_category_id` stay
+internal, never hydrated), `Repositories/Contracts/CategoryRepositoryInterface.php`,
+`Repositories/Wpdb/WpdbCategoryRepository.php` (`listAll()`, `SELECT id, slug, name FROM
+{prefix}categories ORDER BY name ASC`), and `Api/CategoryController.php` registering a
+**public** `GET /categories` (`permission_callback: '__return_true'`, matching
+`AuthController`'s public-route pattern) — wired into `RestApiBootstrap` (now takes a 4th
+`CategoryController` constructor param) and `Plugin.php`'s services try-block. New
+`CategoryControllerTest.php` (seeded-rows shape assertion, empty-table case); `SqliteWpdb`
+test stub gained a `categories` table (it didn't have one before). All 90 PHPUnit tests
+pass. **Frontend (app repo, pushed to `main`, `9428f9a`):** new `CatalogScreen.tsx` —
+on-mount (gated by an `isActive` prop, mirroring `AddSearchScreen`) calls the now-public
+`apiRequest<{categories}>('/categories')` (no `authenticated: true`), shows `SkeletonLoader`
+while loading, a plain Bulgarian message on error/empty, otherwise a flat name list — no
+prices, no offers, nothing tappable. `App.tsx`'s top-level tab switch now renders
+`CatalogScreen` instead of `AddSearchScreen`, and no longer threads `onOpenAddSearch`/
+`onItemAdded`/`selectedListRecord` — that state moved into `HomeScreen.tsx`, which now
+holds `addSearchOpen` and renders `AddSearchScreen` as a `position: fixed` full-screen
+overlay (with its own `.appbar`/`.iconbtn` back button) above the open `ListScreen` when
+true. `ListScreen.tsx`'s existing 🔍 button (already wired to `onOpenAddSearch`) needed no
+changes — it now opens the overlay instead of switching the app-level tab. Closing the
+overlay (back tap or `onItemAdded`) clears `addSearchOpen`; the list underneath is
+untouched, so the Owner lands back on the same list, not the Lists overview.
+`bottomNav.test.tsx` updated (Каталог assertions); new `catalogScreen.test.tsx` (renders
+categories, empty state, error/offline state, doesn't fetch while inactive — all pass); new
+`App.test.tsx` case asserting the 🔍 → overlay → close round-trip (passes in isolation; see
+below). `npx tsc --noEmit` and `npm run build` both pass. Running the **full** Vitest suite
+in one process reproduces the same pre-existing, environment-specific failures already
+flagged in the §2.3c/§2.2d/§2.3d entries above (`App.test.tsx` hook timeouts,
+`addSearch.test.tsx`'s `btoa` "Invalid character") — confirmed identical when running just
+those two files together; the new test passes cleanly when run alone or alongside the other
+seven unaffected files (`bottomNav`, `catalogScreen`, `offlineBanner`,
+`syncStatusIndicator`, `theme`, `db`, `connectivity`, all 7 files green). **Owner
+verification on shopping.flux.bg of this slice's acceptance criteria is outstanding** —
+after the next FTP deploy, confirm: bottom nav shows exactly "Списъци"/"Каталог" (no
+"Добавяне"); Каталог lists category names with nothing tappable; the List screen's 🔍 opens
+Add/Search as an overlay and closing it returns to the same list; adding an item through
+that overlay still works (offline-safe, optimistic, syncs). No migration is needed for this
+slice (the `categories` table and its seed already existed from `§0.4`), so no
+deactivate/reactivate step is required — `GET /categories` should work immediately once the
+plugin's `main` branch FTP-deploys.
+
 **Build order (2026-06-17, revised same day):** §3.1 (done) → §4.0 (done) → §2.3a (done) → §2.3b (done) → §2.3c (done)
-→ §2.2d (done) → **§2.3d (done)** → §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 (Family) → §2.5 (Favorites) → M5.
+→ §2.2d (done) → §2.3d (done) → **§4.0b (done)** → §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 (Family) → §2.5 (Favorites) → M5.
 Rationale: §4.0 is pure frontend with no DB dependency. §3.2/§3.3 (ingestion + cron) follow
 immediately so real offers are in the DB before §4.1 ships — the Owner sees real prices from
 day one, not empty state. §2.3a/§2.3b/§2.3c jumped the queue ahead of §2.2d same day — see incident

@@ -5,7 +5,7 @@ import { afterAll, beforeEach, expect, test, vi } from 'vitest';
 import App from '../App';
 import { apiRequest } from '../api/client';
 import { clearScheduledRefresh } from '../api/session';
-import { clearDatabase } from '../storage/db';
+import { clearDatabase, enqueueMutation, putList } from '../storage/db';
 import { useAuthStore } from '../store/auth';
 
 const baseUrl = 'https://www.example.com/wp-json/si/v1';
@@ -482,4 +482,207 @@ test('logout clears the store and returns to auth', async () => {
     expect(useAuthStore.getState().accessToken).toBeNull();
   });
   expect(await screen.findByLabelText('Email')).toBeInTheDocument();
+});
+
+test('boot pulls a list from the server that does not exist in local IndexedDB yet', async () => {
+  useAuthStore.getState().setSession({
+    accessToken: makeToken({ user_id: 10, family_ids: [], display_name: 'Boris' }),
+    expiresIn: 900,
+    user: { id: 10, displayName: 'Boris', familyIds: [] }
+  });
+
+  mockFetch.mockImplementation((input) => {
+    const url = typeof input === 'string' ? input : input.toString();
+
+    if (url.endsWith('/auth/refresh')) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ auth: { access_token: makeToken({ user_id: 10, family_ids: [], display_name: 'Boris' }), expires_in: 900 } }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+    }
+
+    if (url.endsWith('/lists')) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            lists: [
+              {
+                id: '900',
+                client_uuid: 'server-list-uuid-1',
+                name: 'Server-only list',
+                owner_type: 'user',
+                owner_id: '10',
+                updated_at: '2026-06-17T10:00:00.000Z'
+              }
+            ]
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+    }
+
+    return Promise.resolve(new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+  });
+
+  renderApp();
+
+  expect(await screen.findByRole('button', { name: /Server-only list/i })).toBeInTheDocument();
+});
+
+test('boot pull does not overwrite a local list with a pending mutation queued against it', async () => {
+  useAuthStore.getState().setSession({
+    accessToken: makeToken({ user_id: 11, family_ids: [], display_name: 'Galya' }),
+    expiresIn: 900,
+    user: { id: 11, displayName: 'Galya', familyIds: [] }
+  });
+
+  await putList({
+    client_uuid: 'local-list-uuid-1',
+    name: 'My local edit',
+    owner_type: 'user',
+    owner_id: 11,
+    updated_at: '2026-06-17T12:00:00.000Z'
+  });
+  await enqueueMutation({
+    client_uuid: 'mutation-uuid-1',
+    endpoint: '/lists',
+    method: 'POST',
+    body: { name: 'My local edit' },
+    created_at: '2026-06-17T12:00:00.000Z',
+    attempts: 0,
+    status: 'pending',
+    entity_client_uuid: 'local-list-uuid-1'
+  });
+
+  mockFetch.mockImplementation((input) => {
+    const url = typeof input === 'string' ? input : input.toString();
+
+    if (url.endsWith('/auth/refresh')) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ auth: { access_token: makeToken({ user_id: 11, family_ids: [], display_name: 'Galya' }), expires_in: 900 } }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+    }
+
+    if (url.endsWith('/lists')) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            lists: [
+              {
+                id: '901',
+                client_uuid: 'local-list-uuid-1',
+                name: 'Stale server name',
+                owner_type: 'user',
+                owner_id: '11',
+                updated_at: '2026-06-10T00:00:00.000Z'
+              }
+            ]
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+    }
+
+    return Promise.resolve(new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+  });
+
+  renderApp();
+
+  expect(await screen.findByRole('button', { name: /My local edit/i })).toBeInTheDocument();
+  expect(screen.queryByText(/Stale server name/i)).not.toBeInTheDocument();
+});
+
+test('opening a list pulls its items from the server when local IndexedDB has none', async () => {
+  useAuthStore.getState().setSession({
+    accessToken: makeToken({ user_id: 13, family_ids: [], display_name: 'Elena' }),
+    expiresIn: 900,
+    user: { id: 13, displayName: 'Elena', familyIds: [] }
+  });
+
+  await putList({
+    client_uuid: 'synced-list-uuid-1',
+    id: '902',
+    name: 'Synced list',
+    owner_type: 'user',
+    owner_id: 13,
+    updated_at: '2026-06-17T12:00:00.000Z'
+  });
+
+  mockFetch.mockImplementation((input) => {
+    const url = typeof input === 'string' ? input : input.toString();
+
+    if (url.endsWith('/auth/refresh')) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ auth: { access_token: makeToken({ user_id: 13, family_ids: [], display_name: 'Elena' }), expires_in: 900 } }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+    }
+
+    if (url.endsWith('/lists')) {
+      return Promise.resolve(new Response(JSON.stringify({ lists: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    }
+
+    if (url.endsWith('/lists/902')) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            list: { id: '902', client_uuid: 'synced-list-uuid-1', name: 'Synced list', owner_type: 'user', owner_id: '13', updated_at: '2026-06-17T12:00:00.000Z' },
+            items: [
+              {
+                id: '700',
+                client_uuid: 'server-item-uuid-1',
+                list_id: '902',
+                user_product_id: 'up-700',
+                quantity: 3,
+                unit: 'бр.',
+                is_checked: false,
+                updated_at: '2026-06-17T12:00:00.000Z',
+                term: 'кашкавал'
+              }
+            ]
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+    }
+
+    return Promise.resolve(new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+  });
+
+  renderApp();
+
+  await userEvent.click(await screen.findByRole('button', { name: /Synced list/i }));
+
+  expect(await screen.findByText('кашкавал')).toBeInTheDocument();
+});
+
+test('boot offline (GET /lists rejects) still renders local-first data without an error', async () => {
+  useAuthStore.getState().setSession({
+    accessToken: makeToken({ user_id: 12, family_ids: [], display_name: 'Stoyan' }),
+    expiresIn: 900,
+    user: { id: 12, displayName: 'Stoyan', familyIds: [] }
+  });
+
+  await putList({
+    client_uuid: 'offline-list-uuid-1',
+    name: 'Cached locally',
+    owner_type: 'user',
+    owner_id: 12,
+    updated_at: '2026-06-17T12:00:00.000Z'
+  });
+
+  Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+  mockFetch.mockRejectedValue(new TypeError('Failed to fetch'));
+
+  renderApp();
+
+  expect(await screen.findByRole('button', { name: /Cached locally/i })).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });

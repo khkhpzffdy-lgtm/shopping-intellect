@@ -80,5 +80,32 @@ export const logout = () =>
 export const fetchProtected = <T>(path: string, options?: Omit<RequestOptions, 'authenticated'>) =>
   apiRequest<T>(path, { ...options, authenticated: true });
 
+export type ServerListDto = {
+  id: string;
+  client_uuid: string;
+  name: string;
+  owner_type: 'user';
+  owner_id: string;
+  updated_at: string;
+};
+
+export type ServerListItemDto = {
+  id: string;
+  client_uuid: string;
+  list_id: string;
+  user_product_id: string;
+  quantity: number;
+  unit: string;
+  is_checked: boolean;
+  updated_at: string;
+  term: string | null;
+};
+
+export const fetchLists = () =>
+  apiRequest<{ lists: ServerListDto[] }>('/lists', { authenticated: true });
+
+export const fetchListWithItems = (id: string) =>
+  apiRequest<{ list: ServerListDto; items: ServerListItemDto[] }>(`/lists/${id}`, { authenticated: true });
+
 export { ApiError };
 export type { AuthEnvelope, SessionEnvelope };

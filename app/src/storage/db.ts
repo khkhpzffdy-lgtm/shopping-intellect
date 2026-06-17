@@ -266,3 +266,92 @@ export const getListItem = async (clientUuid: string) => {
   const db = await getDb();
   return db.get('list_items', clientUuid);
 };
+
+const hasQueuedMutation = async (entityClientUuid: string) => {
+  const queued = await getQueuedMutations(['pending', 'in_flight', 'failed']);
+  return queued.some((mutation) => mutation.entity_client_uuid === entityClientUuid);
+};
+
+export const mergeServerList = async (serverList: {
+  client_uuid: string;
+  id: string;
+  name: string;
+  owner_type: 'user';
+  owner_id: string;
+  updated_at: string;
+}) => {
+  if (await hasQueuedMutation(serverList.client_uuid)) {
+    return;
+  }
+
+  const db = await getDb();
+  const local = await db.get('lists', serverList.client_uuid);
+
+  if (local && local.updated_at >= serverList.updated_at) {
+    return;
+  }
+
+  await db.put('lists', {
+    client_uuid: serverList.client_uuid,
+    id: serverList.id,
+    name: serverList.name,
+    owner_type: serverList.owner_type,
+    owner_id: Number(serverList.owner_id),
+    updated_at: serverList.updated_at
+  });
+};
+
+export const mergeServerListItem = async (
+  serverItem: {
+    client_uuid: string;
+    id: string;
+    list_id: string;
+    user_product_id: string;
+    quantity: number;
+    unit: string;
+    is_checked: boolean;
+    updated_at: string;
+    term: string | null;
+  },
+  listClientUuid: string
+) => {
+  if (await hasQueuedMutation(serverItem.client_uuid)) {
+    return;
+  }
+
+  const db = await getDb();
+  const local = await db.get('list_items', serverItem.client_uuid);
+
+  if (local && local.updated_at >= serverItem.updated_at) {
+    return;
+  }
+
+  if (serverItem.term) {
+    const existingProduct = await db.get('user_products', serverItem.user_product_id);
+    if (!existingProduct) {
+      await db.put('user_products', {
+        client_uuid: serverItem.user_product_id,
+        id: serverItem.user_product_id,
+        owner_type: 'user',
+        owner_id: 0,
+        term: serverItem.term,
+        normalized_term: normalizeTerm(serverItem.term),
+        created_at: serverItem.updated_at
+      });
+    }
+  }
+
+  await db.put('list_items', {
+    client_uuid: serverItem.client_uuid,
+    id: serverItem.id,
+    list_client_uuid: listClientUuid,
+    list_id: serverItem.list_id,
+    user_product_client_uuid: serverItem.user_product_id,
+    user_product_id: serverItem.user_product_id,
+    quantity: serverItem.quantity,
+    unit: serverItem.unit,
+    is_checked: serverItem.is_checked,
+    created_at: local?.created_at ?? serverItem.updated_at,
+    updated_at: serverItem.updated_at
+  });
+};

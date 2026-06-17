@@ -1,4 +1,4 @@
-import { ApiError, logout } from '../api/client';
+import { ApiError, fetchListWithItems, fetchLists, logout } from '../api/client';
 import { clearScheduledRefresh } from '../api/session';
 import { flushQueuedMutations } from '../sync/flush';
 import { sendMutation } from '../sync/sendMutation';
@@ -13,6 +13,8 @@ import {
   getMutationStatusCounts,
   getUserProductByTerm,
   markMutationInFlight,
+  mergeServerList,
+  mergeServerListItem,
   putList,
   putListItem,
   putUserProduct,
@@ -93,6 +95,18 @@ export const HomeScreen = ({ onOpenAddSearch, onItemAdded }: HomeScreenProps) =>
 
   useEffect(() => {
     void refreshLists();
+
+    const pullListsFromServer = async () => {
+      try {
+        const { lists: serverLists } = await fetchLists();
+        await Promise.all(serverLists.map((serverList) => mergeServerList(serverList)));
+        await refreshLists();
+      } catch {
+        // Offline boot or network failure — keep showing the local-first data (07 §3.3).
+      }
+    };
+
+    void pullListsFromServer();
   }, []);
 
   useEffect(() => {
@@ -101,7 +115,25 @@ export const HomeScreen = ({ onOpenAddSearch, onItemAdded }: HomeScreenProps) =>
     }
 
     void refreshItems(selectedListKey);
-  }, [selectedListKey]);
+
+    const serverListId = selectedList?.id;
+    if (!serverListId) {
+      // List hasn't synced yet — nothing to pull until it has a server id.
+      return;
+    }
+
+    const pullListItemsFromServer = async () => {
+      try {
+        const { items: serverItems } = await fetchListWithItems(serverListId);
+        await Promise.all(serverItems.map((serverItem) => mergeServerListItem(serverItem, selectedListKey)));
+        await refreshItems(selectedListKey);
+      } catch {
+        // Offline boot or network failure — keep showing the local-first data (07 §3.3).
+      }
+    };
+
+    void pullListItemsFromServer();
+  }, [selectedListKey, selectedList?.id]);
 
   useEffect(() => {
     if (!user) {

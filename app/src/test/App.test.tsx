@@ -355,6 +355,34 @@ test('adding an item to a list whose create-list mutation has not resolved still
   });
 });
 
+test('creating a list and adding an item while offline does not surface an error', async () => {
+  useAuthStore.getState().setSession({
+    accessToken: makeToken({ user_id: 7, family_ids: [], display_name: 'Petar' }),
+    expiresIn: 900,
+    user: { id: 7, displayName: 'Petar', familyIds: [] }
+  });
+
+  Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+  mockFetch.mockRejectedValue(new TypeError('Failed to fetch'));
+
+  renderApp();
+
+  await screen.findByText('No lists yet');
+  await userEvent.click(screen.getByRole('button', { name: 'New list' }));
+  await userEvent.type(screen.getByLabelText('List name'), 'Offline list');
+  await userEvent.click(screen.getByRole('button', { name: 'Create list' }));
+
+  expect(await screen.findByRole('button', { name: /Offline list/i })).toBeInTheDocument();
+  expect(screen.queryByText(/Could not create the list/i)).not.toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole('button', { name: /Offline list/i }));
+  await userEvent.type(screen.getByLabelText('Item term'), 'мляко');
+  await userEvent.click(screen.getByRole('button', { name: 'Add item' }));
+
+  expect(await screen.findByText('мляко')).toBeInTheDocument();
+  expect(screen.queryByText(/Could not add the item/i)).not.toBeInTheDocument();
+});
+
 test('mode toggle switches between planning and shopping rendering', async () => {
   useAuthStore.getState().setSession({
     accessToken: makeToken({ user_id: 8, family_ids: [], display_name: 'Niki' }),

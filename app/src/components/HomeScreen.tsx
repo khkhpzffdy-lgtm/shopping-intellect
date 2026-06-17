@@ -185,11 +185,15 @@ export const HomeScreen = ({ onOpenAddSearch, onItemAdded }: HomeScreenProps) =>
       });
       await refreshLists();
 
-      const claimedMutation = await markMutationInFlight(clientUuid);
-      if (claimedMutation) {
-        await sendMutation(claimedMutation);
+      try {
+        const claimedMutation = await markMutationInFlight(clientUuid);
+        if (claimedMutation) {
+          await sendMutation(claimedMutation);
+        }
+        await refreshLists();
+      } catch {
+        // Keep local optimistic state and the pending mutation — it will sync later.
       }
-      await refreshLists();
     } catch (error) {
       setErrorMessage(
         formatActionError(error, 'Could not create the list on this device yet. Please try again.')
@@ -257,11 +261,15 @@ export const HomeScreen = ({ onOpenAddSearch, onItemAdded }: HomeScreenProps) =>
       await refreshLists();
       await refreshItems(selectedList.client_uuid);
 
-      const claimedMutation = await markMutationInFlight(itemClientUuid);
-      if (claimedMutation) {
-        await sendMutation(claimedMutation);
+      try {
+        const claimedMutation = await markMutationInFlight(itemClientUuid);
+        if (claimedMutation) {
+          await sendMutation(claimedMutation);
+        }
+        await refreshItems(selectedList.client_uuid);
+      } catch {
+        // Keep local optimistic state and the pending mutation — it will sync later.
       }
-      await refreshItems(selectedList.client_uuid);
     } catch (error) {
       setErrorMessage(
         formatActionError(error, 'Could not add the item on this device yet. Please try again.')

@@ -70,7 +70,7 @@ export const noteAuthBreadcrumb = (event: string) => {
 
 export const saveAuthHandoff = (envelope: SessionEnvelope) => {
   try {
-    sessionStorage.setItem(
+    localStorage.setItem(
       AUTH_HANDOFF_KEY,
       JSON.stringify({
         saved_at: Date.now(),
@@ -85,7 +85,7 @@ export const saveAuthHandoff = (envelope: SessionEnvelope) => {
 
 export const consumeAuthHandoff = (): SessionEnvelope | null => {
   try {
-    const raw = sessionStorage.getItem(AUTH_HANDOFF_KEY);
+    const raw = localStorage.getItem(AUTH_HANDOFF_KEY);
     if (!raw) {
       return null;
     }
@@ -95,26 +95,28 @@ export const consumeAuthHandoff = (): SessionEnvelope | null => {
       envelope?: SessionEnvelope;
     };
 
+    // Always remove it — it's single-use regardless of TTL.
+    localStorage.removeItem(AUTH_HANDOFF_KEY);
+
     if (
       typeof parsed.saved_at !== 'number' ||
       !parsed.envelope ||
       Date.now() - parsed.saved_at > AUTH_HANDOFF_TTL_MS
     ) {
-      sessionStorage.removeItem(AUTH_HANDOFF_KEY);
       return null;
     }
 
     noteAuthBreadcrumb('consumed auth handoff');
     return parsed.envelope;
   } catch {
-    sessionStorage.removeItem(AUTH_HANDOFF_KEY);
+    localStorage.removeItem(AUTH_HANDOFF_KEY);
     return null;
   }
 };
 
 export const clearAuthHandoff = () => {
   try {
-    sessionStorage.removeItem(AUTH_HANDOFF_KEY);
+    localStorage.removeItem(AUTH_HANDOFF_KEY);
   } catch {
     // Best-effort cleanup only.
   }
@@ -137,7 +139,9 @@ export const scheduleSilentRefresh = (expiresAt: number | null) => {
   const delay = Math.max(0, expiresAt - Date.now() - 60_000);
   refreshTimeoutId = window.setTimeout(() => {
     void refreshSession().catch(() => {
-      useAuthStore.getState().clearSession();
+      // Silent failure — the next API call will get 401 and retry refresh.
+      // Never clear the session here: a network hiccup or iOS background
+      // suspension should not log the user out.
     });
   }, delay);
 };

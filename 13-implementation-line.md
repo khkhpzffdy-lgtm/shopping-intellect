@@ -185,27 +185,21 @@ their own terms, offline, and have it sync.*
 The numbering above (§2.4/§2.5 before M3/M4) reflects **dependency order** and stays as the
 canonical reference for *what depends on what*. The actual **build order** diverges from it.
 
-**Revised build order (2026-06-17):**
+**Revised build order (2026-06-17, updated same day):**
 
 ```
-§2.3 (done) → §3.1 (done) → §4.0 → §4.1 → §4.2 → §4.3 → §3.2 → §3.3 → §2.4 → §2.5 → M5
+§2.3 (done) → §3.1 (done) → §4.0 → §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 → §2.5 → M5
 ```
 
 **Why this order:**
 
-- **§3.1 (done)** — crawler base built first, but the Owner correctly identified that crawlers
-  have no payoff until the user can see comparison results. The remaining §3.x slices (ingestion,
-  cron) are moved *after* the frontend screens that consume the data.
-- **§4.0 → §4.1 → §4.2 → §4.3 (next)** — the full user-facing comparison flow comes first.
-  This is what the user actually experiences: navigation shell + Add/Search screen, then candidate
-  offers, then match-by-selection, then basket comparison. The Owner can verify real product
-  behaviour at each step. For §4.1 and §4.2, the DB will have no real StoreOffer rows yet —
-  that is fine, the endpoints return empty results gracefully (`200` with empty array), and the
-  UI handles it. The Owner can manually seed 1–2 test rows if needed to verify the flow.
-- **§3.2 → §3.3 (after §4.x)** — IngestionService and the cron CLI now have a UI to feed.
-  When §3.2 ships and the crawler runs, the Owner will immediately see real prices appear in
-  the §4.3 Comparison screen — a concrete, visible payoff rather than abstract DB rows.
-- **§2.4 (Family) then §2.5 (Favorites)** — dependency-safe here; nothing in §3.x or §4.x
+- **§4.0 (next)** — navigation shell + Add/Search screen first. Pure frontend, no dependency
+  on offers or ingestion. Gets the Owner a real second screen immediately.
+- **§3.2 → §3.3 (before §4.1)** — IngestionService and cron come right after §4.0, while
+  §4.1/§4.2/§4.3 are being designed. When §4.1 ships, there will already be real offers in
+  the DB from the crawler — the Owner sees real prices from day one, not an empty state.
+- **§4.1 → §4.2 → §4.3** — the full comparison flow, now backed by real data.
+- **§2.4 (Family) then §2.5 (Favorites)** — dependency-safe; nothing in §3.x or §4.x
   depends on them.
 - **M5** unchanged at the end.
 
@@ -325,9 +319,9 @@ M3 depends only on M0 (Money + schema + repositories), so **crawl/ingestion can 
 parallel with M1–M2** if the Owner wants two Codex tracks running — but M4 needs **both** M2 (terms)
 and M3 (offers) closed. Within each milestone, build top-to-bottom.
 
-**This diagram is dependency order, not build order** — see "Re-sequencing (2026-06-15)" above
-M3 for the actual order Slices are tackled in (§2.3 → §3.x → §4.0/§4.1 → §4.2 → §2.4 → §2.5 →
-§4.3 → M5).
+**This diagram is dependency order, not build order** — see "Re-sequencing (2026-06-17)" above
+M3 for the actual order Slices are tackled in (§3.1 done → §4.0 → §3.2 → §3.3 → §4.1 → §4.2 →
+§4.3 → §2.4 → §2.5 → M5).
 
 -----
 

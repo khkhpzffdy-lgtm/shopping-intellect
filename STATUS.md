@@ -220,12 +220,11 @@ pending §2.2c criteria) is outstanding.
 
 **Next up: §4.0** — navigation shell + Add/Search screen (frontend, `app/`).
 
-**Build order (2026-06-17 re-sequencing):** §3.1 (done) → **§4.0 → §4.1 → §4.2 → §4.3**
-(full user-facing comparison flow first) → **§3.2 → §3.3** (IngestionService + cron, now
-has a UI to feed) → §2.4 (Family) → §2.5 (Favorites) → M5.
-Rationale: crawlers have no visible payoff until the user can see comparison results.
-Build the screens first so when §3.2 ships and the crawler runs, prices immediately
-appear in the UI. See `13-implementation-line.md` "Re-sequencing" for full reasoning.
+**Build order (2026-06-17):** §3.1 (done) → **§4.0** → §3.2 → §3.3 → §4.1 → §4.2 → §4.3
+→ §2.4 (Family) → §2.5 (Favorites) → M5.
+Rationale: §4.0 is pure frontend with no DB dependency. §3.2/§3.3 (ingestion + cron) follow
+immediately so real offers are in the DB before §4.1 ships — the Owner sees real prices from
+day one, not empty state. See `13-implementation-line.md` "Re-sequencing" for full reasoning.
 
 ---
 

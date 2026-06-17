@@ -312,6 +312,49 @@ test('adding, toggling, removing, and reloading items stays local-first', async 
   });
 });
 
+test('adding an item to a list whose create-list mutation has not resolved still attempts to sync', async () => {
+  useAuthStore.getState().setSession({
+    accessToken: makeToken({ user_id: 6, family_ids: [], display_name: 'Vera' }),
+    expiresIn: 900,
+    user: { id: 6, displayName: 'Vera', familyIds: [] }
+  });
+
+  // The create-list POST never resolves, so the list never gets a server id.
+  mockFetch.mockImplementation((input) => {
+    const url = typeof input === 'string' ? input : (input as Request).url;
+    if (url.endsWith('/lists')) {
+      return new Promise(() => {});
+    }
+    return Promise.resolve(
+      new Response(JSON.stringify({ item: { id: 'srv-item-1' }, user_product: { id: 'srv-product-1' } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    );
+  });
+
+  renderApp();
+
+  await screen.findByText('No lists yet');
+  await userEvent.click(screen.getByRole('button', { name: 'New list' }));
+  await userEvent.type(screen.getByLabelText('List name'), 'Pending list');
+  await userEvent.click(screen.getByRole('button', { name: 'Create list' }));
+
+  await userEvent.click(await screen.findByRole('button', { name: /Pending list/i }));
+  await userEvent.type(screen.getByLabelText('Item term'), 'мляко');
+  await userEvent.click(screen.getByRole('button', { name: 'Add item' }));
+
+  expect(await screen.findByText('мляко')).toBeInTheDocument();
+
+  await waitFor(() => {
+    const itemPostCall = mockFetch.mock.calls.find(([input, init]) => {
+      const url = typeof input === 'string' ? input : (input as Request).url;
+      return url.includes('/items') && (init as RequestInit | undefined)?.method === 'POST';
+    });
+    expect(itemPostCall).toBeDefined();
+  });
+});
+
 test('mode toggle switches between planning and shopping rendering', async () => {
   useAuthStore.getState().setSession({
     accessToken: makeToken({ user_id: 8, family_ids: [], display_name: 'Niki' }),

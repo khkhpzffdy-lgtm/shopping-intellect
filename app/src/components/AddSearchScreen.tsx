@@ -5,14 +5,14 @@ import {
   enqueueMutation,
   getAllUserProducts,
   getUserProductByTerm,
-  markMutationDone,
+  markMutationInFlight,
   putListItem,
   putUserProduct,
   touchListUpdatedAt,
   type ShoppingListRecord,
   type UserProductRecord
 } from '../storage/db';
-import { applyMutationSuccess } from '../sync/applyMutationSuccess';
+import { sendMutation } from '../sync/sendMutation';
 import { generateUuid } from '../utils/uuid';
 
 type AddSearchScreenProps = {
@@ -127,32 +127,11 @@ export const AddSearchScreen = ({ selectedList, onItemAdded, isActive = true }: 
       setQuery('');
       onItemAdded();
 
-      if (!selectedList.id) return;
-
       try {
-        const response = await apiRequest<{
-          item?: { id?: string; is_checked?: boolean };
-          user_product?: { id?: string };
-        }>(`/lists/${selectedList.id}/items`, {
-          method: 'POST',
-          body: mutationBody,
-          authenticated: true
-        });
-
-        await applyMutationSuccess(
-          {
-            client_uuid: itemClientUuid,
-            endpoint: `/lists/${selectedList.id}/items`,
-            method: 'POST',
-            body: mutationBody,
-            created_at: now,
-            attempts: 0,
-            status: 'pending',
-            entity_client_uuid: itemClientUuid
-          },
-          response
-        );
-        await markMutationDone(itemClientUuid);
+        const claimedMutation = await markMutationInFlight(itemClientUuid);
+        if (claimedMutation) {
+          await sendMutation(claimedMutation);
+        }
       } catch {
         // queued — will sync on next drain
       }

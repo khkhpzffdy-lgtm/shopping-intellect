@@ -1,7 +1,7 @@
 import { ApiError, logout } from '../api/client';
 import { clearScheduledRefresh } from '../api/session';
-import { applyMutationSuccess } from '../sync/applyMutationSuccess';
 import { flushQueuedMutations } from '../sync/flush';
+import { sendMutation } from '../sync/sendMutation';
 import { useAuthStore } from '../store/auth';
 import { useThemeStore } from '../store/theme';
 import {
@@ -12,7 +12,7 @@ import {
   getLists,
   getPendingMutationCounts,
   getUserProductByTerm,
-  markMutationDone,
+  markMutationInFlight,
   putList,
   putListItem,
   putUserProduct,
@@ -24,7 +24,6 @@ import {
 } from '../storage/db';
 import { ListsScreen } from './ListsScreen';
 import { ListScreen } from './ListScreen';
-import { apiRequest } from '../api/client';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { generateUuid } from '../utils/uuid';
 
@@ -186,36 +185,10 @@ export const HomeScreen = ({ onOpenAddSearch, onItemAdded }: HomeScreenProps) =>
       });
       await refreshLists();
 
-      const response = await apiRequest<{ list?: { id?: string } }>('/lists', {
-        method: 'POST',
-        body: {
-          name: optimisticList.name,
-          owner_type: 'user',
-          owner_id: user.id,
-          client_uuid: clientUuid
-        },
-        authenticated: true
-      });
-
-      await applyMutationSuccess(
-        {
-          client_uuid: clientUuid,
-          endpoint: '/lists',
-          method: 'POST',
-          body: {
-            name: optimisticList.name,
-            owner_type: 'user',
-            owner_id: user.id,
-            client_uuid: clientUuid
-          },
-          created_at: now,
-          attempts: 0,
-          status: 'pending',
-          entity_client_uuid: clientUuid
-        },
-        response
-      );
-      await markMutationDone(clientUuid);
+      const claimedMutation = await markMutationInFlight(clientUuid);
+      if (claimedMutation) {
+        await sendMutation(claimedMutation);
+      }
       await refreshLists();
     } catch (error) {
       setErrorMessage(
@@ -284,49 +257,10 @@ export const HomeScreen = ({ onOpenAddSearch, onItemAdded }: HomeScreenProps) =>
       await refreshLists();
       await refreshItems(selectedList.client_uuid);
 
-      if (!selectedList.id) {
-        return;
+      const claimedMutation = await markMutationInFlight(itemClientUuid);
+      if (claimedMutation) {
+        await sendMutation(claimedMutation);
       }
-
-      const response = await apiRequest<{
-        item?: { id?: string; is_checked?: boolean };
-        user_product?: { id?: string };
-      }>(`/lists/${selectedList.id}/items`, {
-        method: 'POST',
-        body: {
-          client_uuid: itemClientUuid,
-          quantity: optimisticItem.quantity,
-          unit: optimisticItem.unit,
-          user_product: {
-            client_uuid: product.client_uuid,
-            term: product.term
-          }
-        },
-        authenticated: true
-      });
-
-      await applyMutationSuccess(
-        {
-          client_uuid: itemClientUuid,
-          endpoint: `/lists/${selectedList.id}/items`,
-          method: 'POST',
-          body: {
-            client_uuid: itemClientUuid,
-            quantity: optimisticItem.quantity,
-            unit: optimisticItem.unit,
-            user_product: {
-              client_uuid: product.client_uuid,
-              term: product.term
-            }
-          },
-          created_at: now,
-          attempts: 0,
-          status: 'pending',
-          entity_client_uuid: itemClientUuid
-        },
-        response
-      );
-      await markMutationDone(itemClientUuid);
       await refreshItems(selectedList.client_uuid);
     } catch (error) {
       setErrorMessage(
@@ -378,12 +312,10 @@ export const HomeScreen = ({ onOpenAddSearch, onItemAdded }: HomeScreenProps) =>
     await refreshItems(selectedList.client_uuid);
 
     try {
-      await apiRequest(`/lists/${selectedList.id}/items/${item.id}`, {
-        method: 'PATCH',
-        body: { is_checked: updatedItem.is_checked },
-        authenticated: true
-      });
-      await markMutationDone(mutationUuid);
+      const claimedMutation = await markMutationInFlight(mutationUuid);
+      if (claimedMutation) {
+        await sendMutation(claimedMutation);
+      }
       await refreshItems(selectedList.client_uuid);
     } catch {
       // Keep local optimistic state and the pending mutation.
@@ -416,11 +348,10 @@ export const HomeScreen = ({ onOpenAddSearch, onItemAdded }: HomeScreenProps) =>
     await refreshItems(selectedList.client_uuid);
 
     try {
-      await apiRequest(`/lists/${selectedList.id}/items/${item.id}`, {
-        method: 'DELETE',
-        authenticated: true
-      });
-      await markMutationDone(mutationUuid);
+      const claimedMutation = await markMutationInFlight(mutationUuid);
+      if (claimedMutation) {
+        await sendMutation(claimedMutation);
+      }
       await refreshItems(selectedList.client_uuid);
     } catch {
       // Keep the delete queued.

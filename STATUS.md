@@ -120,6 +120,7 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 | §2.2c | Visual redesign of Lists overview + List screen to match `design/screens2.jsx` | ✅ done |
 | §2.3 | Offline mutation flush/retry engine (durable reconnect sync, drains `mutation_queue`) | ✅ done |
 | §2.3a | Wpdb null-safe value binder (shared `WpdbNullSafe::bind()`) | ✅ done |
+| §2.3b | Unify the frontend mutation pipeline (one `sendMutation`, no per-screen copies) | ✅ done |
 | §3.1 | `HttpClient` interface + `WpHttpClient` + `AbstractCrawler` + `LidlCrawler` stub + `RawOffer` DTO + `bin/crawl.php` | ✅ done |
 | §4.0 | Navigation shell + Add/Search screen (`BottomNav`, `AddSearchScreen`, `App.tsx` tab state, `HomeScreen`/`ListScreen` wired) | ✅ done |
 
@@ -168,6 +169,25 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
   could clobber a list's server `id` if the drain had just written it
   concurrently. Tests in `app/src/test/flush.test.ts`. Pushed to `main`
   (`be211c9`), CI build+deploy green.
+
+- **§2.3b unify the mutation pipeline (done):** `app/src/sync/sendMutation.ts` is now
+  the single function that dispatches every optimistic write — `resolveEndpoint`
+  (moved from `flush.ts`, still exported from `sendMutation.ts`), `apiRequest`,
+  `applyMutationSuccess`, and `markMutationDone`/`markMutationFailed` all live inside
+  it exactly once. `flush.ts`'s `drainQueuedMutations` and all five previous
+  hand-rolled call sites (`HomeScreen.tsx`'s `handleCreateList`, `handleAddItem`,
+  `handleToggleChecked`, `handleRemoveItem`, and `AddSearchScreen.tsx`'s
+  `addItemToList`) now call `markMutationInFlight` then `sendMutation` instead of
+  duplicating the enqueue/send/apply/mark-done sequence inline. `handleAddItem`'s
+  dead-end early return for an unsynced parent list (`if (!selectedList.id) return`)
+  is removed — `resolveEndpoint` already resolves the real list id when available,
+  so adding an item to a list created earlier in the same offline session now
+  actually attempts to sync instead of silently sitting pending with no error.
+  New tests: `app/src/test/sendMutation.test.ts` (asserts `flushQueuedMutations`
+  routes every queued mutation through `sendMutation` exactly once — a regression
+  guard against a sixth hand-rolled copy reappearing) and a new case in
+  `App.test.tsx` proving the unsynced-parent-list add now reaches the network.
+  Pushed to `main`.
 
 This list is **not guaranteed complete or current** — if it looks stale, check
 `app/src/components/` and `app/src/App.tsx` directly rather than trusting this.
@@ -222,9 +242,9 @@ above. Pushed to `main` (`be211c9`), CI build+deploy green. Owner verification o
 shopping.flux.bg of §2.3's reconnect-drain acceptance criteria (and the still-
 pending §2.2c criteria) is outstanding.
 
-**Next up: §2.3b** — unify the frontend mutation pipeline (dedupe `enqueueMutation` call sites).
+**Next up: §2.3c** — `SyncStatusIndicator` redesign + offline banner, now displaying the unified queue.
 
-**Build order (2026-06-17, revised same day):** §3.1 (done) → §4.0 (done) → §2.3a (done) → **§2.3b** → §2.3c
+**Build order (2026-06-17, revised same day):** §3.1 (done) → §4.0 (done) → §2.3a (done) → §2.3b (done) → **§2.3c**
 → §2.2d → §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 (Family) → §2.5 (Favorites) → M5.
 Rationale: §4.0 is pure frontend with no DB dependency. §3.2/§3.3 (ingestion + cron) follow
 immediately so real offers are in the DB before §4.1 ships — the Owner sees real prices from
@@ -252,7 +272,8 @@ Owner direction, since it was actively breaking production):
    88 tests green, including new null-path coverage that fails without the fix.
 4. Frontend mutation-send logic was hand-duplicated **five** times (`HomeScreen.tsx` ×4 — create
    list, add item, toggle checked, remove item — `AddSearchScreen.tsx` ×1) — why (1)-(3) could be
-   fixed for "create a list" without fixing "add an item." This is §2.3b below, still open.
+   fixed for "create a list" without fixing "add an item." **Fixed in §2.3b**: all five now route
+   through the single shared `app/src/sync/sendMutation.ts`.
 Full writeup + the architecture decision (shared null-safe binder; one shared `sendMutation`):
 `decisions.md` "Resolved — sync-pipeline incident" · `01-architecture.md` §5/§6.5 (amended) ·
 `07-frontend.md` §5.5 (added).

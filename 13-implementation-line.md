@@ -165,6 +165,25 @@ their own terms, offline, and have it sync.*
 - **Owner sees:** every screen reads in one language; the empty-state "Create list" button
   actually creates a list; every open list has a working search icon that opens Add/Search.
 
+### §2.3d — Pull lists/items from the server on boot (new, added 2026-06-17)
+- **Goal:** fix a real data-visibility bug found while verifying §2.2d: the same account
+  logged in from two different browsers shows two different sets of lists, because the
+  client only ever reads from local IndexedDB and never calls the already-working
+  `GET /lists`/`GET /lists/{id}` endpoints. Add the missing read-side reconciliation that
+  `07 §3.1` already specifies ("hydrates from IndexedDB first, then reconciles with the
+  network") but was never built — write-side sync (§2.3/§2.3a/§2.3b) has no read-side
+  counterpart today.
+- **Dep:** §2.2d (found while verifying it), §2.3b (merge must respect the unified pending-
+  mutation state)
+- **Canon:** `07 §3.1` (the unimplemented "reconciles with the network" half) · `07 §4.3`
+  (last-write-wins on `updated_at`, no merge UI) · `06 §6` `GET /lists`/`GET /lists/{id}`
+  shapes · full spec + build instructions: `slices/13-2.3d-server-pull-on-boot.md`.
+- **Iron:** no regression to offline-first/optimistic behaviour — boot must still paint
+  instantly from IndexedDB before any network call, online or offline; a pending/failed
+  local mutation must never be silently overwritten by a server read.
+- **Owner sees:** logging into the same account from a second browser/device now shows the
+  same lists and items as the first, after a reload — not an empty or partial set.
+
 ### §2.3 — Sync engine (last-write-wins, no conflict UI)
 - **Goal:** the queued mutations flush to the server idempotently; server `updated_at` last-write-wins; the only recency signal is "updated X ago."
 - **Dep:** §2.2
@@ -222,8 +241,15 @@ canonical reference for *what depends on what*. The actual **build order** diver
 **Revised build order (2026-06-17, updated same day):**
 
 ```
-§2.3 (done) → §3.1 (done) → §4.0 (done) → §2.3a → §2.3b → §2.3c → §2.2d → §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 → §2.5 → M5
+§2.3 (done) → §3.1 (done) → §4.0 (done) → §2.3a → §2.3b → §2.3c → §2.2d → §2.3d → §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 → §2.5 → M5
 ```
+
+**§2.3d (added 2026-06-17, immediately after §2.2d)** — found while verifying §2.2d on
+shopping.flux.bg: same-account, different-browser sessions showed different lists. Root
+cause is a missing read path, not a §2.2d regression (§2.2d touched presentation/copy
+only, never `db.ts`/sync). Sequenced right after §2.2d, before §3.2, because it's a real
+data-correctness bug — the Owner should not keep using the app cross-device while lists
+silently diverge per browser.
 
 **§2.3a/§2.3b/§2.3c (added 2026-06-17, ahead of §2.2d)** — a production incident the same day
 (every list/item stuck `sync-pending` forever) traced to a stacked set of bugs, two of which are

@@ -125,6 +125,7 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 | §4.0 | Navigation shell + Add/Search screen (`BottomNav`, `AddSearchScreen`, `App.tsx` tab state, `HomeScreen`/`ListScreen` wired) | ✅ done |
 | §2.3c | `SyncStatusIndicator` icon-only redesign + offline banner (supersedes §2.2d item 1) | ✅ done |
 | §2.2d | UI consistency cleanup: `EmptyState` wired + translated, one-language copy pass, list-screen search icon → Add/Search | ✅ done |
+| §2.3d | Pull lists/items from server on boot — fixes "different browsers, same account, different lists" | ⏳ next |
 
 **App (`app/`):** Vite + React PWA, FTP deploy wired. Implemented so far:
 - `AuthScreen` — register/login screen, working against the plugin's auth endpoints
@@ -300,10 +301,30 @@ files (`App.test.tsx`, `flush.test.ts`, `sendMutation.test.ts`, `addSearch.test.
 in the §2.3c entry above are still flaky in this sandbox for the same pre-existing,
 environment-specific reasons (confirmed again via `git stash` on this session) — all other
 test files (`bottomNav`, `offlineBanner`, `syncStatusIndicator`, `theme`, `db`,
-`connectivity`) pass clean. Not yet pushed to `main` — see note below.
+`connectivity`) pass clean. Pushed to `main` (`4f5ad83`), CI build+deploy green.
+
+**Bug found while verifying §2.2d on shopping.flux.bg (2026-06-17): different browsers,
+same account, show different lists.** The Owner tested in a normal Safari tab and an
+incognito window logged into the **same account** and saw different lists in each. Root
+cause: `app/src/storage/db.ts`'s `getLists()`/`getListItems()` read **only** from local
+IndexedDB, which is populated exclusively by this device's own local writes. **Nothing in
+the frontend ever calls `GET /lists` or `GET /lists/{id}`** to pull server-side state —
+even though both endpoints are fully implemented and working
+(`plugin/src/Api/ListController.php` `handleList`/`handleGet`, registered and
+permission-checked). `07-frontend.md` §3.1 already specifies the intended behaviour
+("data hydrates from IndexedDB first, then **reconciles with the network**") but that
+network-reconciliation half was never built — §2.2b/§2.2c/§4.0/§2.3* all built and
+hardened the **write** side (the mutation queue) but the **read** side has no
+boot-time/list-open pull. Confirmed by reading `ListController.php` directly: its
+`listData()`/`itemData()` response builders don't even return `client_uuid` per row yet
+(needed for the merge), which is itself a small backend gap. New slice written:
+**`slices/13-2.3d-server-pull-on-boot.md`** — adds `GET /lists`/`GET /lists/{id}` calls,
+a local IndexedDB merge with last-write-wins + a pending-mutation guard (so an unsynced
+local edit is never clobbered by a stale server read), wired into `HomeScreen.tsx`'s
+existing boot/list-open `useEffect`s, silently no-op on offline boot. Not yet built.
 
 **Build order (2026-06-17, revised same day):** §3.1 (done) → §4.0 (done) → §2.3a (done) → §2.3b (done) → §2.3c (done)
-→ **§2.2d (done)** → §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 (Family) → §2.5 (Favorites) → M5.
+→ §2.2d (done) → **§2.3d (next — fixes the cross-browser/same-account bug above)** → §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 (Family) → §2.5 (Favorites) → M5.
 Rationale: §4.0 is pure frontend with no DB dependency. §3.2/§3.3 (ingestion + cron) follow
 immediately so real offers are in the DB before §4.1 ships — the Owner sees real prices from
 day one, not empty state. §2.3a/§2.3b/§2.3c jumped the queue ahead of §2.2d same day — see incident

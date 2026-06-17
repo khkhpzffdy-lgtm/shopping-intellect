@@ -426,6 +426,51 @@ Closed at the owner's direction (the two `10` Decision Required items):
   - **`DELETE /families/{id}/members/{userId}`** — auth widened to **admin OR self** (`caller == userId`); the **last admin cannot leave/be removed while other members remain** → `409 last_admin` (promote first); a **solo** member leaving succeeds and the empty family is **deleted** server-side. **↻ fresh token** for a self-leaver.
     (`06` §6.6, §4.2/§4.3.) Remaining minor open: an explicit multi-member `DELETE /families/{id}` dissolve (see Still open).
 
+### Resolved — sync-pipeline incident: header stripping, dropped headers, duplicated mutation/null-binding code (2026-06-17)
+
+A live-production incident (every list/item silently stuck `sync-pending` forever)
+traced to **four independent bugs stacked on top of each other**, only the last of
+which was a real auth/session defect (already fixed earlier the same day):
+
+1. **Host-level:** the production Apache/PHP runtime stripped the `Authorization`
+   header before PHP ever saw it (common on FastCGI/PHP-FPM-via-Apache shared
+   hosting) — every bearer-authenticated request failed `401 token_invalid`
+   regardless of token validity. Fixed in `app/.htaccess` (forwards the header via
+   `RewriteRule ... [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]`).
+2. **Client-level:** `fetchAuth()` merged headers via `{...init.headers}`, but
+   `init.headers` is a `Headers` instance — spreading one yields no own enumerable
+   properties, so the `Authorization` header was silently dropped before every
+   `fetch()` call, independent of (1). Fixed in `app/src/api/session.ts` (merge
+   through `new Headers(init.headers)`).
+3. **Backend null-binding:** `$wpdb->prepare()` coerces a PHP `null` to `0` for
+   `%d` / `''` for `%s` — never to SQL `NULL`. `WpdbUserProductRepository` bound a
+   brand-new `UserProduct`'s `category_id: null` (matching-in-progress, by design —
+   D §4) straight through `%d`, writing `0`, which violates the
+   `fk_user_products_category` foreign key and crashes the request `500`. The same
+   unguarded pattern was found independently in `WpdbUserProfileRepository`
+   (`display_name`/`onboarding_state`) and `WpdbRefreshTokenRepository`
+   (`rotated_at`/`revoked_at`) — silent wrong-value writes there, not yet a crash,
+   because those columns carry no FK.
+4. **Frontend duplication:** the optimistic-write → enqueue → immediate-send →
+   apply-success → mark-done sequence was hand-written **five separate times**
+   (`HomeScreen.tsx` ×4 — create list, add item, toggle checked, remove item —
+   `AddSearchScreen.tsx` ×1) instead of going through one
+   shared function — which is *why* (1)–(3) could be partially masked/unmasked
+   inconsistently across "create a list" vs "add an item": they are not the same
+   code path, so a fix or a bug in one does not apply to the other.
+
+**Decision — both layers get a single, shared, mandatory path going forward**
+(detail in `01` §5/§6.5, builder slices in `13`):
+
+- [x] **Backend:** every nullable column write in `Repositories/Wpdb` goes through a
+  shared null-safe binder (`NULL` literal when the value is `null`, never a raw
+  `%d`/`%s` on a nullable PHP value). No repository hand-rolls this again.
+- [x] **Frontend:** every optimistic mutation (current and future — lists, items,
+  user-products, and anything later: profiles, photos, prices, favorites, brand
+  anchors) is sent through **one shared `runMutation`/send function**, used
+  identically by the immediate "try now" attempt and the background queue drain.
+  No screen hand-rolls its own copy of the enqueue/send/apply-success sequence.
+
 -----
 
 ## 15. Execution Model (how the build is actually run)

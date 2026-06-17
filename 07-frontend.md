@@ -195,6 +195,28 @@ On a `2xx`, the client writes the server `id` back into the IndexedDB mirror (ke
 `client_uuid`), updates `meta.last_sync`, and **invalidates the relevant TanStack Query
 keys** (§6.3) so any open comparison/candidate views refetch fresh server truth.
 
+### 5.5 One execution path — no per-screen duplicates (resolved `decisions.md` 2026-06-17)
+
+Every screen that performs an optimistic write (create a list, add an item, toggle
+checked, favorite, anchor a brand — present and future entities alike: profiles,
+photos, prices, anything added later) follows the **same** three steps through a
+**single shared function**, never a hand-rolled copy:
+
+1. Write the optimistic record to IndexedDB and enqueue the mutation (§5.1).
+2. Call **one** shared `sendMutation(mutation)` — the exact same function the
+   background flush (§5.3) calls when draining the queue — to attempt it immediately
+   while the UI is open and online.
+3. On success, reconcile (§5.4) and delete the queue record; on failure, leave it
+   queued for the background flush to retry — never silently swallow the failure
+   into just an on-screen error message with no queue follow-up.
+
+**There must be exactly one implementation of "send this mutation and apply the
+result."** The first cut of this queue had five independent copies of step 2 spread
+across screen components, which is *why* one entity's create path could be fixed while
+a near-identical sibling's stayed broken — they were never the same code to begin
+with. A screen component may decide *when* to call `sendMutation`; it must never
+reimplement *what* it does.
+
 -----
 
 ## 6. State layers — Zustand vs TanStack Query

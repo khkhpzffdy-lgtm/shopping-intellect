@@ -153,12 +153,46 @@ their own terms, offline, and have it sync.*
 - **Owner sees:** the app visually matches the `design/screens2.jsx` mockup for Lists
   overview and the List screen; create/add/check/remove and offline behaviour unchanged.
 
+### §2.2d — UI consistency cleanup (new, added 2026-06-17)
+- **Goal:** fix four concrete consistency bugs found by audit: a duplicated
+  `SyncStatusIndicator`, a dead `EmptyState` "Create list" button + duplicate inline empty-state
+  markup, a partial English/Bulgarian copy mix, and a dead `onOpenAddSearch` prop with no button
+  wired to it. Presentation/prop-wiring only — no data/sync/API changes.
+- **Dep:** §2.2c
+- **Canon:** `design/screens2.jsx` `ListScreen` appbar search icon · `10 §8.19`/`§8.26` · slice
+  spec: `slices/13-2.2d-ui-consistency-cleanup.md` (full audit findings + build instructions).
+- **Iron:** no regression to §2.2b/§2.2c's optimistic local-first offline behaviour.
+- **Owner sees:** every screen reads in one language; the empty-state "Create list" button
+  actually creates a list; every open list has a working search icon that opens Add/Search.
+
 ### §2.3 — Sync engine (last-write-wins, no conflict UI)
 - **Goal:** the queued mutations flush to the server idempotently; server `updated_at` last-write-wins; the only recency signal is "updated X ago."
 - **Dep:** §2.2
 - **Canon:** `07 §5` (queue flush) · `10 §1`/`§7.6` (no conflict/merge UI ever) · `11` cross-cutting truths.
 - **Iron:** `client_uuid` idempotency (§2.6).
 - **Owner sees:** edits the same list from two sessions; later write wins, **no merge screen** appears, "updated X ago" reflects recency.
+
+### §2.3a — Wpdb null-safe value binder (hardening, added 2026-06-17)
+- **Goal:** no `Repositories/Wpdb` class can silently write `0`/`''` for a `null` value again — one shared binder, used everywhere a nullable column is written.
+- **Dep:** §2.3 (retrofits its repositories)
+- **Canon:** `01 §5` rule 2 (amended 2026-06-17) · `decisions.md` "Resolved — sync-pipeline incident" (2026-06-17) · full findings: `slices/13-2.3a-wpdb-null-safe-binder.md`.
+- **Iron:** only `Repositories/Wpdb` touches `$wpdb`, prepared statements exclusively (§5 rule 2) — this slice tightens that rule, doesn't loosen it.
+- **Owner sees:** adding a brand-new term/item no longer 500s; nothing else changes visibly.
+
+### §2.3b — Unify the mutation pipeline (hardening, added 2026-06-17)
+- **Goal:** one shared `sendMutation` function used by both the immediate "try now" attempt and the background queue flush — no screen hand-rolls its own copy.
+- **Dep:** §2.3, §2.3a (cleanest once the backend stops 500ing on the same paths)
+- **Canon:** `07 §5.5` (added 2026-06-17) · `decisions.md` "Resolved — sync-pipeline incident" (2026-06-17) · full findings: `slices/13-2.3b-unify-mutation-pipeline.md`.
+- **Iron:** no regression to optimistic local-first behaviour (§2.2/§2.3); `client_uuid` idempotency unchanged (§2.6).
+- **Owner sees:** creating a list and adding an item behave identically under the same network conditions — no more "one works, the other doesn't."
+
+### §2.3c — `SyncStatusIndicator` redesign: icon-only cue + offline banner (UX, added 2026-06-17)
+- **Goal:** no visible badge while synced/online; a persistent thin offline banner only when actually offline; an icon (not text) for genuinely pending/failed mutations.
+- **Dep:** §2.3b (the indicator must reflect the now-unified queue, not the old duplicated paths)
+- **Canon:** `10 §7`/`§8.19` (banner vs inline-cue variants, three distinct states) · `07 §5.3` (flush triggers) · `design/screens2.jsx` line 72 + `design/app.css` lines 248-254 (exact offline-banner markup/copy/style to port) · full spec + build instructions: `slices/13-2.3c-sync-indicator-offline-banner.md`.
+- **Iron:** no conflict-resolution UI (`10 §7.6`); sync-failed stays a distinct, never-hidden state (`10 §7`).
+- **Owner sees:** lists/items sync silently and invisibly while online; an "Офлайн" strip appears only with no connection; a small icon (not a text badge) appears only for something genuinely stuck.
+- **Supersedes `§2.2d` SCOPE item 1** (dedupe `SyncStatusIndicator`) — this slice replaces both inline copies anyway; skip that item if `§2.2d` runs after this one.
 
 ### §2.4 — Families: create, email-token invite, accept deep-link, roles
 - **Goal:** create a family, invite by email, accept via the emailed token deep-link; family-owned lists/terms resolve owner = family.
@@ -188,8 +222,22 @@ canonical reference for *what depends on what*. The actual **build order** diver
 **Revised build order (2026-06-17, updated same day):**
 
 ```
-§2.3 (done) → §3.1 (done) → §4.0 → §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 → §2.5 → M5
+§2.3 (done) → §3.1 (done) → §4.0 (done) → §2.3a → §2.3b → §2.3c → §2.2d → §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 → §2.5 → M5
 ```
+
+**§2.3a/§2.3b/§2.3c (added 2026-06-17, ahead of §2.2d)** — a production incident the same day
+(every list/item stuck `sync-pending` forever) traced to a stacked set of bugs, two of which are
+data-integrity/reliability defects (a Wpdb null-binding bug that 500s on every brand-new term, and
+four independent hand-rolled copies of the same mutation-send logic). These jump ahead of the
+cosmetic §2.2d cleanup because they are live correctness bugs, not UI polish. §2.3c (the UX
+redesign of the sync indicator + offline banner, the Owner's original ask before the incident)
+sits after them because it would otherwise be built on top of the broken duplicated pipeline it's
+trying to display the state of. Full incident writeup: `decisions.md` "Resolved — sync-pipeline
+incident" (2026-06-17).
+
+**§2.2d (added 2026-06-17)** — small, low-risk UI cleanup slotted in before §3.2 since it's pure
+frontend, touches the same files §2.2c/§4.0 just touched (best done while that context is fresh),
+and unblocks nothing but is unblocked by nothing either.
 
 **Why this order:**
 

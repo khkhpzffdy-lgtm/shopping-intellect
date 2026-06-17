@@ -157,6 +157,17 @@ Rules, in order of importance:
    `Clock`, `Logger`). They are unit-testable without a WP install. This single rule
    is what makes the Stage-3 extraction a move, not a rewrite (D §6).
 1. **Only `Repositories/Wpdb` may use `$wpdb`.** Prepared statements exclusively.
+   **Nullable columns go through a shared null-safe binder, never a raw `%d`/`%s`
+   placeholder.** `$wpdb->prepare()` coerces a PHP `null` argument to `0` for `%d` and
+   `''` for `%s` — never to SQL `NULL`. Any model field typed `?int`/`?string`/`?DateTime`
+   (e.g. `UserProduct::categoryId`, `brandAnchor`; `UserProfile::displayName`,
+   `onboardingState`; `RefreshToken::rotatedAt`, `revokedAt`) that is bound directly with
+   `%d`/`%s` will silently write the wrong value — `0` against a foreign key crashes the
+   request; against a plain nullable column it just corrupts the row silently. **Found in
+   three repositories independently (`WpdbUserProductRepository`,
+   `WpdbUserProfileRepository`, `WpdbRefreshTokenRepository`) because each hand-wrote its
+   own `INSERT`/`UPDATE` — the fix is one shared helper in `Repositories/Wpdb`, not a
+   per-class patch.**
 1. **Crawlers don’t write to the DB.** They fetch and parse, emitting normalized
    `RawOffer` DTOs to `IngestionService`, which validates, categorizes and persists.
    Crawlers depend on the `HttpClient` interface, not on WP’s HTTP API directly —
@@ -248,6 +259,17 @@ merge without ID collisions. The SW
 background-sync queue replays mutations on reconnect; conflicts resolve last-write-wins
 on server `updated_at` (server clock is authoritative), surfaced in UI as
 “updated X sec ago” (D §9). Details in `07`.
+
+**One mutation pipeline, no per-screen duplicates.** Every optimistic write (create a
+list, create an item, toggle checked, favorite, anchor a brand — present and future)
+queues through and is *sent* by **one shared function**, not a bespoke
+enqueue-then-immediately-also-fetch block written inline in each screen's handler. The
+immediate "try now" attempt and the background queue drain (on reconnect/focus) must
+call the **same** send function — never two parallel implementations of "make this
+mutation happen" that can drift out of sync with each other and fail independently.
+(Found duplicated five times across `HomeScreen.tsx`/`AddSearchScreen.tsx` in the first
+implementation — one screen's create path got exercised and partially hardened while a
+near-identical sibling carried its own, separately-broken copy.)
 
 -----
 

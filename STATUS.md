@@ -119,6 +119,7 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 | §2.2 | Lists end-to-end (backend + frontend) | ✅ done |
 | §2.2c | Visual redesign of Lists overview + List screen to match `design/screens2.jsx` | ✅ done |
 | §2.3 | Offline mutation flush/retry engine (durable reconnect sync, drains `mutation_queue`) | ✅ done |
+| §2.3a | Wpdb null-safe value binder (shared `WpdbNullSafe::bind()`) | ✅ done |
 | §3.1 | `HttpClient` interface + `WpHttpClient` + `AbstractCrawler` + `LidlCrawler` stub + `RawOffer` DTO + `bin/crawl.php` | ✅ done |
 | §4.0 | Navigation shell + Add/Search screen (`BottomNav`, `AddSearchScreen`, `App.tsx` tab state, `HomeScreen`/`ListScreen` wired) | ✅ done |
 
@@ -221,13 +222,56 @@ above. Pushed to `main` (`be211c9`), CI build+deploy green. Owner verification o
 shopping.flux.bg of §2.3's reconnect-drain acceptance criteria (and the still-
 pending §2.2c criteria) is outstanding.
 
-**Next up: §3.2** — ingestion service + categorization.
+**Next up: §2.3b** — unify the frontend mutation pipeline (dedupe `enqueueMutation` call sites).
 
-**Build order (2026-06-17):** §3.1 (done) → **§4.0** → §3.2 → §3.3 → §4.1 → §4.2 → §4.3
-→ §2.4 (Family) → §2.5 (Favorites) → M5.
+**Build order (2026-06-17, revised same day):** §3.1 (done) → §4.0 (done) → §2.3a (done) → **§2.3b** → §2.3c
+→ §2.2d → §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 (Family) → §2.5 (Favorites) → M5.
 Rationale: §4.0 is pure frontend with no DB dependency. §3.2/§3.3 (ingestion + cron) follow
 immediately so real offers are in the DB before §4.1 ships — the Owner sees real prices from
-day one, not empty state. See `13-implementation-line.md` "Re-sequencing" for full reasoning.
+day one, not empty state. §2.3a/§2.3b/§2.3c jumped the queue ahead of §2.2d same day — see incident
+note immediately below. See `13-implementation-line.md` "Re-sequencing" for full reasoning.
+
+**2026-06-17 production incident — sync pipeline, four stacked bugs.** Every list/item was stuck
+`sync-pending` forever. Root-caused and fixed live (outside the normal Slice flow, by explicit
+Owner direction, since it was actively breaking production):
+1. Host stripped the `Authorization` header before PHP saw it → fixed in `app/.htaccess`
+   (`RewriteRule ... [E=HTTP_AUTHORIZATION:...]`). Pushed `3ac40ad`.
+2. `fetchAuth()` spread a `Headers` instance (`{...init.headers}`), which silently drops every
+   entry → fixed in `app/src/api/session.ts` (`new Headers(init.headers)`). Pushed `540fb75`.
+3. `WpdbUserProductRepository::insert()`/`update()` bound a brand-new term's
+   `category_id: null` through a raw `%d` placeholder, which `$wpdb->prepare()` coerces to `0`,
+   violating the `fk_user_products_category` FK and 500ing every "add a new item" call.
+   **Targeted hotfix shipped live** (plugin `main` `e5c58cc`, verified via direct API call —
+   `201` with `category_id: null` correctly returned) so item-add works again now. **Fixed
+   for real in §2.3a** (plugin `main` `2b99243`): a shared `WpdbNullSafe::bind()` helper in
+   `Repositories/Wpdb/` now backs `WpdbUserProductRepository` (replacing the inline TODO
+   ternary), `WpdbUserProfileRepository::upsert()`, and `WpdbRefreshTokenRepository::insert()`
+   (the latter two had the same coercion bug — silent wrong-value writes, not yet a crash).
+   PHPUnit's `SqliteWpdb` test stub was also corrected to replicate real `$wpdb`'s null→0/''
+   coercion (it had been silently doing the right thing itself, masking the bug from tests) —
+   88 tests green, including new null-path coverage that fails without the fix.
+4. Frontend mutation-send logic was hand-duplicated **five** times (`HomeScreen.tsx` ×4 — create
+   list, add item, toggle checked, remove item — `AddSearchScreen.tsx` ×1) — why (1)-(3) could be
+   fixed for "create a list" without fixing "add an item." This is §2.3b below, still open.
+Full writeup + the architecture decision (shared null-safe binder; one shared `sendMutation`):
+`decisions.md` "Resolved — sync-pipeline incident" · `01-architecture.md` §5/§6.5 (amended) ·
+`07-frontend.md` §5.5 (added).
+
+**§2.2d (new, added 2026-06-17):** a UI-consistency audit (triggered by an Owner request for a
+unified design/UX pass) found four concrete bugs in the screens §2.2c/§4.0 shipped: a
+`SyncStatusIndicator` duplicated verbatim in `ListScreen.tsx` and `ListsScreen.tsx`; `EmptyState`'s
+"Create list" button has no `onClick` (dead) and `ListsScreen.tsx` renders its own duplicate
+inline empty-state instead of using the `EmptyState` component; a partial English/Bulgarian copy
+mix (`ListScreen.tsx`/`EmptyState.tsx`/`HomeScreen.tsx` error strings are English while
+`ListsScreen.tsx`/`AddSearchScreen.tsx` are Bulgarian); and `ListScreen.tsx`'s `onOpenAddSearch`
+prop is threaded all the way from `App.tsx` but never called by any button. Full findings +
+build instructions in `slices/13-2.2d-ui-consistency-cleanup.md`. **Item 1 (dedupe
+`SyncStatusIndicator`) is now superseded by `§2.3c`** (added same day, runs first per the
+revised build order below) — skip item 1 when this slice actually runs, it'll already be done.
+Slotted in before §3.2 — see
+`13-implementation-line.md` §2.2d. Also see new `14-user-stories.md` (user stories per flow,
+flags that there is no `PATCH`/`DELETE /lists/{id}` anywhere in the canon — no way to rename or
+delete a whole list today — as an open `decisions.md §14` candidate, not invented here).
 
 ---
 

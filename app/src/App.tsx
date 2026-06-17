@@ -35,9 +35,38 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('lists');
   const [selectedListRecord, setSelectedListRecord] = useState<ShoppingListRecord | null>(null);
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const accessToken = useAuthStore((state) => state.accessToken);
   const expiresAt = useAuthStore((state) => state.expiresAt);
   const theme = useThemeStore((state) => state.theme);
+
+  // iOS Safari mispositions `position: fixed` elements while the on-screen
+  // keyboard is open — hide the bottom nav whenever a text input is focused
+  // rather than fight that with viewport CSS tricks.
+  useEffect(() => {
+    const isTextInput = (target: EventTarget | null) =>
+      target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+
+    const handleFocusIn = (event: FocusEvent) => {
+      if (isTextInput(event.target)) {
+        setIsInputFocused(true);
+      }
+    };
+
+    const handleFocusOut = (event: FocusEvent) => {
+      if (isTextInput(event.target)) {
+        setIsInputFocused(false);
+      }
+    };
+
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
+
+    return () => {
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -208,7 +237,7 @@ export default function App() {
               isActive={activeTab === 'add'}
             />
           </div>
-          <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+          {isInputFocused ? null : <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />}
         </>
       ) : null}
     </div>

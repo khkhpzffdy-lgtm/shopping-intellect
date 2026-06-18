@@ -144,7 +144,7 @@
 /* ---- Lists overview ---- */
 .si-root .listcard {
   display: flex; align-items: center; gap: 4px;
-  width: 100%; padding: 4px;
+  width: 100%; min-width: 0; padding: 4px;
   background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
 }
 .si-root .listcard__open {

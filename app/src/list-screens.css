@@ -5,7 +5,10 @@
   padding: 8px 4px 6px;
   flex-wrap: wrap;
 }
-.si-root .appbar__title { font-size: var(--fs-title); font-weight: 700; letter-spacing: -0.3px; flex: 1; }
+.si-root .appbar__title {
+  font-size: var(--fs-title); font-weight: 700; letter-spacing: -0.3px; flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .si-root input.appbar__title {
   border: none; background: transparent; outline: none;
   color: var(--ink); font-family: inherit; padding: 0; min-width: 0;
@@ -149,7 +152,11 @@
   flex: 1; min-width: 0; text-align: left; padding: 12px;
   background: none; border: none; cursor: pointer;
 }
-.si-root .listcard__name { font-size: var(--fs-h1); font-weight: 600; color: var(--ink); }
+.si-root .listcard__open > div { min-width: 0; flex: 1; }
+.si-root .listcard__name {
+  font-size: var(--fs-h1); font-weight: 600; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .si-root .listcard__meta { margin-top: 6px; font-size: var(--fs-body); color: var(--ink-2); }
 .si-root .listcard__badge {
   display: inline-flex; align-items: center; gap: 6px;

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { ListItemView, ShoppingListRecord } from '../storage/db';
 import { useListModeStore } from '../store/listMode';
 import { SyncStatusIndicator } from './SyncStatusIndicator';
@@ -18,6 +19,7 @@ type ListScreenProps = {
   onOpenAddSearch: () => void;
   onToggleChecked: (item: ListItemView) => void;
   onRemoveItem: (item: ListItemView) => void;
+  onRenameList: (name: string) => void;
 };
 
 const ITEM_EMOJI = '🛒';
@@ -33,10 +35,23 @@ export const ListScreen = ({
   onAddItem,
   onOpenAddSearch,
   onToggleChecked,
-  onRemoveItem
+  onRemoveItem,
+  onRenameList
 }: ListScreenProps) => {
   const mode = useListModeStore((state) => state.modes[list.client_uuid] ?? 'planning');
   const setMode = useListModeStore((state) => state.setMode);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(list.name);
+
+  const commitRename = () => {
+    const trimmed = nameDraft.trim();
+    setEditingName(false);
+    if (trimmed === '' || trimmed === list.name) {
+      setNameDraft(list.name);
+      return;
+    }
+    onRenameList(trimmed);
+  };
 
   return (
     <section className="space-y-4">
@@ -44,7 +59,36 @@ export const ListScreen = ({
         <button type="button" onClick={onBack} className="iconbtn" aria-label="Back">
           ←
         </button>
-        <div className="appbar__title">{list.name}</div>
+        {editingName ? (
+          <input
+            aria-label="List name"
+            className="appbar__title"
+            value={nameDraft}
+            autoFocus
+            onChange={(event) => setNameDraft(event.target.value)}
+            onBlur={commitRename}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                commitRename();
+              } else if (event.key === 'Escape') {
+                setNameDraft(list.name);
+                setEditingName(false);
+              }
+            }}
+          />
+        ) : (
+          <button
+            type="button"
+            className="appbar__title"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+            onClick={() => {
+              setNameDraft(list.name);
+              setEditingName(true);
+            }}
+          >
+            {list.name}
+          </button>
+        )}
         <button type="button" onClick={onOpenAddSearch} className="iconbtn" aria-label="Search">
           🔍
         </button>

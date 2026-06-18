@@ -17,7 +17,7 @@ export const resolveEndpoint = async (mutation: MutationQueueRecord) => {
     return `/lists/${list.id}/items`;
   }
 
-  if (mutation.method === 'DELETE') {
+  if (mutation.method === 'DELETE' || mutation.method === 'PATCH') {
     const listMatch = mutation.endpoint.match(/^\/lists\/([^/]+)$/);
     if (!listMatch) {
       return mutation.endpoint;

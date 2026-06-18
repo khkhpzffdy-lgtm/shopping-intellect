@@ -813,3 +813,138 @@ test('deleting a list while offline removes it immediately and it stays deleted 
 
   confirmSpy.mockRestore();
 });
+
+test('renaming a list from the app bar saves immediately and persists after reload', async () => {
+  useAuthStore.getState().setSession({
+    accessToken: makeToken({ user_id: 17, family_ids: [], display_name: 'Iva' }),
+    expiresIn: 900,
+    user: { id: 17, displayName: 'Iva', familyIds: [] }
+  });
+
+  await putList({
+    client_uuid: 'rename-list-uuid-1',
+    id: '960',
+    name: 'Original name',
+    owner_type: 'user',
+    owner_id: 17,
+    updated_at: '2026-06-18T00:00:00.000Z'
+  });
+
+  mockFetch.mockImplementation((input) => {
+    const url = typeof input === 'string' ? input : (input as Request).url;
+    if (url.endsWith('/lists/960')) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ list: { id: '960', name: 'Renamed', client_uuid: 'rename-list-uuid-1', owner_type: 'user', owner_id: '17', item_count: 0, updated_at: '2026-06-18T00:01:00.000Z' } }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+    }
+    return Promise.resolve(new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+  });
+
+  const view = renderApp();
+
+  await userEvent.click(await screen.findByRole('button', { name: 'Original name 0 items' }));
+  await userEvent.click(await screen.findByRole('button', { name: 'Original name' }));
+
+  const input = screen.getByLabelText('List name');
+  await userEvent.clear(input);
+  await userEvent.type(input, 'Renamed{Enter}');
+
+  expect(await screen.findByRole('button', { name: 'Renamed' })).toBeInTheDocument();
+  await waitFor(() => {
+    expect(mockFetch.mock.calls.some(([input]) => (typeof input === 'string' ? input : (input as Request).url).endsWith('/lists/960'))).toBe(true);
+  });
+
+  view.unmount();
+  renderApp();
+
+  await userEvent.click(await screen.findByRole('button', { name: 'Renamed 0 items' }));
+  expect(await screen.findByRole('button', { name: 'Renamed' })).toBeInTheDocument();
+});
+
+test('renaming a list while offline updates the title immediately and keeps it after reconnect', async () => {
+  useAuthStore.getState().setSession({
+    accessToken: makeToken({ user_id: 18, family_ids: [], display_name: 'Boris' }),
+    expiresIn: 900,
+    user: { id: 18, displayName: 'Boris', familyIds: [] }
+  });
+
+  await putList({
+    client_uuid: 'rename-list-uuid-2',
+    id: '961',
+    name: 'Offline original',
+    owner_type: 'user',
+    owner_id: 18,
+    updated_at: '2026-06-18T00:00:00.000Z'
+  });
+
+  Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+  mockFetch.mockRejectedValue(new TypeError('Failed to fetch'));
+
+  renderApp();
+
+  await userEvent.click(await screen.findByRole('button', { name: 'Offline original 0 items' }));
+  await userEvent.click(await screen.findByRole('button', { name: 'Offline original' }));
+
+  const input = screen.getByLabelText('List name');
+  await userEvent.clear(input);
+  await userEvent.type(input, 'Offline renamed{Enter}');
+
+  expect(await screen.findByRole('button', { name: 'Offline renamed' })).toBeInTheDocument();
+
+  Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
+  mockFetch.mockImplementation((input) => {
+    const url = typeof input === 'string' ? input : (input as Request).url;
+    if (url.endsWith('/lists/961')) {
+      return Promise.resolve(new Response(JSON.stringify({ list: { id: '961', name: 'Offline renamed', client_uuid: 'rename-list-uuid-2', owner_type: 'user', owner_id: '18', item_count: 0, updated_at: '2026-06-18T00:02:00.000Z' } }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    }
+    return Promise.resolve(new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+  });
+  window.dispatchEvent(new Event('online'));
+
+  await waitFor(() => {
+    expect(mockFetch.mock.calls.some(([input]) => (typeof input === 'string' ? input : (input as Request).url).endsWith('/lists/961'))).toBe(true);
+  });
+
+  expect(screen.getByRole('button', { name: 'Offline renamed' })).toBeInTheDocument();
+});
+
+test('saving a blank list name does not wipe out the existing name', async () => {
+  useAuthStore.getState().setSession({
+    accessToken: makeToken({ user_id: 19, family_ids: [], display_name: 'Nadia' }),
+    expiresIn: 900,
+    user: { id: 19, displayName: 'Nadia', familyIds: [] }
+  });
+
+  await putList({
+    client_uuid: 'rename-list-uuid-3',
+    id: '962',
+    name: 'Keep me',
+    owner_type: 'user',
+    owner_id: 19,
+    updated_at: '2026-06-18T00:00:00.000Z'
+  });
+
+  mockFetch.mockImplementation(() =>
+    Promise.resolve(new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+  );
+
+  renderApp();
+
+  await userEvent.click(await screen.findByRole('button', { name: 'Keep me 0 items' }));
+  await userEvent.click(await screen.findByRole('button', { name: 'Keep me' }));
+
+  const input = screen.getByLabelText('List name');
+  await userEvent.clear(input);
+  await userEvent.type(input, '   {Enter}');
+
+  expect(await screen.findByRole('button', { name: 'Keep me' })).toBeInTheDocument();
+  expect(
+    mockFetch.mock.calls.some(([input, init]) => {
+      const url = typeof input === 'string' ? input : (input as Request).url;
+      return url.endsWith('/lists/962') && init?.method === 'PATCH';
+    })
+  ).toBe(false);
+});

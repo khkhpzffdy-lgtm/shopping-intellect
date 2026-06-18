@@ -130,4 +130,28 @@ describe('resolveEndpoint resolves a queued list-delete mutation to the real ser
 
     expect(endpoint).toBe('/lists/list-e');
   });
+
+  test('resolves a queued PATCH list-rename mutation to the real server id', async () => {
+    await putList({
+      client_uuid: 'list-f',
+      id: '101',
+      name: 'F',
+      owner_type: 'user',
+      owner_id: 1,
+      updated_at: '2026-06-17T10:05:00.000Z'
+    });
+
+    const endpoint = await resolveEndpoint({
+      client_uuid: 'mut-rename-list-f',
+      endpoint: '/lists/list-f',
+      method: 'PATCH',
+      body: { name: 'New name' },
+      created_at: '2026-06-17T10:05:00.000Z',
+      attempts: 0,
+      status: 'pending',
+      entity_client_uuid: 'list-f'
+    });
+
+    expect(endpoint).toBe('/lists/101');
+  });
 });

@@ -128,6 +128,7 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 | §2.3d | Pull lists/items from server on boot — fixes "different browsers, same account, different lists" | ✅ done |
 | §4.0b | Catalog tab + move Add/Search off the bottom nav | ✅ done |
 | §2.6 | Delete a list (hard delete, items/terms survive) | ✅ done |
+| §2.7 | Rename a list (inline app-bar edit, `PATCH /lists/{id}`) | ✅ done |
 
 **App (`app/`):** Vite + React PWA, FTP deploy wired. Implemented so far:
 - `AuthScreen` — register/login screen, working against the plugin's auth endpoints
@@ -394,19 +395,24 @@ slice (the `categories` table and its seed already existed from `§0.4`), so no
 deactivate/reactivate step is required — `GET /categories` should work immediately once the
 plugin's `main` branch FTP-deploys.
 
-**Build order (2026-06-18, revised):** §3.1 (done) → §4.0 (done) → §2.3a (done) → §2.3b (done) → §2.3c (done)
-→ §2.2d (done) → §2.3d (done) → §4.0b (done) → §2.6 (done) → **§2.7 (next) → §4.0c → §2.8 → §2.9** →
+**Build order (2026-06-18, revised — added §4.0d):** §3.1 (done) → §4.0 (done) → §2.3a (done) → §2.3b (done) → §2.3c (done)
+→ §2.2d (done) → §2.3d (done) → §4.0b (done) → §2.6 (done) → §2.7 (done) → **§4.0c (next) → §2.8 → §4.0d → §2.9** →
 §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 (Family) → §2.5 (Favorites) → M5.
 **2026-06-18 re-sequencing:** the Owner asked for list management (delete/rename), item/
-product detail management, and a Profile screen to be fully solid **before** any
-store-offer matching work starts — so §2.6/§2.7/§4.0c/§2.8/§2.9 (new Slices, see
-`13-implementation-line.md`) are inserted ahead of §3.2. §4.0c is also a real schema/iron-
-rule amendment: `list_items` can now reference a `StoreProduct` directly (a specific item,
-e.g. "Мляко Данон 2% 1л"), not just a `UserProduct` (a broad term, "мляко") — see
-`decisions.md` "Resolved — list_items can target a specific StoreProduct directly"
-(2026-06-18) for the full rationale and schema delta (`list_items.store_product_id`,
-`store_products.source`/`created_by_user_id`/`image_url`). §3.2/§3.3 (ingestion + cron)
-still follow immediately after, so real offers are in the DB before §4.1 ships. §2.3a/
+product detail management, Catalog product management, and a Profile screen to be fully
+solid **before** any store-offer matching work starts — so §2.6/§2.7/§4.0c/§2.8/§4.0d/
+§2.9 (new Slices, see `13-implementation-line.md`) are inserted ahead of §3.2. §4.0c is
+also a real schema/iron-rule amendment: `list_items` can now reference a `StoreProduct`
+directly (a specific item, e.g. "Мляко Данон 2% 1л"), not just a `UserProduct` (a broad
+term, "мляко") — see `decisions.md` "Resolved — list_items can target a specific
+StoreProduct directly" (2026-06-18) for the full rationale and schema delta
+(`list_items.store_product_id`, `store_products.source`/`created_by_user_id`/
+`image_url`). **§4.0d (added later same day) amends the 2026-06-17 "Catalog has no
+connection to list-adding" rule** — Catalog becomes the owner's own product/item manager,
+grouped by bucket, not just a read-only taxonomy browse; see `decisions.md` "Resolved —
+Catalog becomes 'browse my products'" for the full rationale and the new
+`store_products.is_archived` column it needs. §3.2/§3.3 (ingestion + cron) still follow
+immediately after, so real offers are in the DB before §4.1 ships. §2.3a/
 §2.3b/§2.3c jumped the queue ahead of §2.2d on 2026-06-17 — see incident note immediately
 below. See `13-implementation-line.md` "Re-sequencing" for full reasoning.
 
@@ -452,6 +458,41 @@ handle from an earlier test — worth a real fix (singleton connection + explici
 a future slice, out of scope here. All new/changed test files pass when run individually or
 alongside the other unaffected files, matching the verification bar used in every prior
 "flaky in this sandbox" note above. Pushed to `main` in both repos.
+
+**§2.7 is done (2026-06-18).** Rename a list, inline from the List screen's app bar.
+**Backend (plugin repo):** `ListService` gained `renameList(int $userId, int $listId,
+string $name): ?ShoppingList` — reuses `findOwnedList` for the ownership check (null for
+not-found/not-owned), trims and rejects a blank name the same way `createList` already does
+(`\InvalidArgumentException`), then calls the existing `ListRepositoryInterface::update()`
+(`WpdbListRepository::update()` already supported a name-only update — no repository
+changes needed) with a fresh `updated_at` from the injected `Clock`. `ListController` gained
+`PATCH /lists/{id}` → `handlePatchList`: 200 with the updated list on success, 400
+`validation_error` on a blank name, the existing 404 `not_found` otherwise. New
+`ListControllerTest` cases: successful rename + `updated_at` bump, 404 for unknown/unowned
+list (and confirms the other user's list name is untouched), 400 on a blank/whitespace-only
+name (and confirms the original name survives). All 97 PHPUnit tests pass.
+**Frontend (app repo):** `ListScreen.tsx`'s app-bar title is now a button that swaps to an
+autoFocus `<input>` on click; Enter or blur commits (skipped if the trimmed value is blank or
+unchanged), Escape reverts without saving. New `onRenameList: (name: string) => void` prop.
+`HomeScreen.tsx`'s new `handleRenameList` follows the exact optimistic-local (`putList`) →
+enqueue (`PATCH /lists/{id}`, body `{ name }`) → `markMutationInFlight` + `sendMutation` shape
+as `handleDeleteList`/`handleToggleChecked`; for a still-offline-born list (no server `id`
+yet) it merges into the pending create mutation's body via the existing
+`updateMutationBody`, exactly like `handleToggleChecked` does for quantity/checked edits.
+`sendMutation.ts`'s `resolveEndpoint` had three independent `if` blocks (`POST` / `DELETE` /
+unconditional fallback) — **not** a `method !== 'POST'` shared branch as a first draft of
+this slice's spec assumed (corrected in `13-implementation-line.md` §2.7 before
+implementation); a `PATCH` mutation previously fell through to the literal endpoint
+unresolved. Fixed by widening the existing `DELETE` condition to
+`mutation.method === 'DELETE' || mutation.method === 'PATCH'` (identical resolution logic for
+both). New tests: `sendMutation.test.ts` (PATCH `resolveEndpoint` case, mirroring the DELETE
+one), three new `App.test.tsx` cases (online rename persists after reload; offline rename
+queues and survives reconnect; blank-name save is a no-op and issues no PATCH). All pass in
+isolation; running the offline-rename test alongside other tests in the same file reproduces
+the same pre-existing `fake-indexeddb` cross-test flake already flagged in the §2.6 entry
+above (confirmed via `git stash` that "deleting a list while offline..." hangs the same way
+on unmodified `main`) — not introduced by this slice. `npx tsc --noEmit` and `npm run build`
+both pass. Pushed to `main` in both repos.
 
 **2026-06-17 production incident — sync pipeline, four stacked bugs.** Every list/item was stuck
 `sync-pending` forever. Root-caused and fixed live (outside the normal Slice flow, by explicit

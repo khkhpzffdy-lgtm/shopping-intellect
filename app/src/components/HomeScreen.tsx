@@ -396,6 +396,49 @@ export const HomeScreen = () => {
     }
   };
 
+  const handleRenameList = async (name: string) => {
+    if (!selectedList) {
+      return;
+    }
+
+    const updatedList = {
+      ...selectedList,
+      name,
+      updated_at: new Date().toISOString()
+    };
+
+    await putList(updatedList);
+
+    if (!selectedList.id) {
+      await updateMutationBody(selectedList.client_uuid, { name });
+      await refreshLists();
+      return;
+    }
+
+    const mutationUuid = generateUuid();
+    await enqueueMutation({
+      client_uuid: mutationUuid,
+      endpoint: `/lists/${selectedList.id}`,
+      method: 'PATCH',
+      body: { name },
+      created_at: updatedList.updated_at,
+      attempts: 0,
+      status: 'pending',
+      entity_client_uuid: selectedList.client_uuid
+    });
+    await refreshLists();
+
+    try {
+      const claimedMutation = await markMutationInFlight(mutationUuid);
+      if (claimedMutation) {
+        await sendMutation(claimedMutation);
+      }
+      await refreshLists();
+    } catch {
+      // Keep local optimistic state and the pending mutation.
+    }
+  };
+
   const handleDeleteList = async (listKey: string) => {
     const list = lists.find((candidate) => candidate.client_uuid === listKey);
     if (!list) {
@@ -449,6 +492,7 @@ export const HomeScreen = () => {
             onOpenAddSearch={() => setAddSearchOpen(true)}
             onToggleChecked={handleToggleChecked}
             onRemoveItem={handleRemoveItem}
+            onRenameList={handleRenameList}
           />
         ) : (
           <ListsScreen

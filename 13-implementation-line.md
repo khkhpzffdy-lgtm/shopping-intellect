@@ -323,6 +323,41 @@ their own terms, offline, and have it sync.*
   toggling favorite on a UserProduct surfaces it in quick-add (once §2.5 ships); editing a
   StoreProduct's name/photo/barcode persists and survives reload.
 
+### §4.0d — Catalog bucket detail (browse/manage my products)
+- **Goal:** tapping a category bucket in `CatalogScreen` (§4.0b) opens a bucket-detail
+  view instead of doing nothing: the owner's own UserProduct/StoreProduct rows already
+  attached to that bucket (`category_id` match; empty if none yet), with the ability to
+  create a new UserProduct/StoreProduct directly into that bucket, edit (reusing §2.8's
+  detail screens), archive, and add the record to any of the owner's lists. The buckets
+  themselves are unchanged — still the fixed, admin-only-maintained ~20-30 seeded list
+  from §4.0b; a user still can't create/edit/delete a bucket. This **amends** the
+  2026-06-17 "Catalog has no connection to list-adding" clause; it does **not** reopen
+  "no global product-catalog picker" — only the owner's own (and, once `§2.4` ships,
+  family) records are ever shown, never a stranger's.
+- **Dep:** §2.8 (reuses its UserProduct/StoreProduct detail screens for editing), §4.0c
+  (manual StoreProduct creation must exist as a create path), §4.0b (the screen this
+  extends)
+- **Canon:** `decisions.md` "Resolved — Catalog becomes 'browse my products'" (2026-06-18,
+  full rationale — amends "Bottom navigation becomes destinations, not actions,"
+  2026-06-17) · `10 §6` Catalog row (amended 2026-06-18) · `04 §4.3`/`§4.4`
+  (`user_products.category_id`/`store_products.category_id` as the bucket-membership
+  query; new `store_products.is_archived` column from this session) · the existing
+  owner-context rule already governing favorites/recent (D §9) — same scoping, applied
+  here.
+- **Needs a migration** (`store_products.is_archived`, new nullable-default column) —
+  confirm `MigrationRegistry::defaultMigrations()` gets a new entry and `STATUS.md`'s
+  deactivate/activate-to-migrate step is followed after deploy.
+- **Iron:** demand-first — a bucket stays a neutral, fixed concept; only the owner's own
+  attached records are mutable here, never the bucket itself (D §4 unchanged); archiving
+  a record still referenced by an active `list_items` row must be blocked (mirrors the
+  existing `ON DELETE RESTRICT` FK behaviour at the UX layer, not a raw DB error); owner-
+  scoping — until `§2.4` ships, this shows only the logged-in user's own records (no
+  family filter exists yet to apply), never another unrelated user's.
+- **Owner sees:** taps "мляко" in Каталог, sees their own milk-related terms/items (or an
+  empty state if none yet); can add a new term/item right there, edit one, try to archive
+  one that's still on an active list and gets told to remove it from the list first, and
+  add an existing one to a list from this screen.
+
 ### §2.9 — Profile screen
 - **Goal:** a new Профил screen reachable from `ListsScreen`'s app bar (replacing the
   inline theme-toggle + logout buttons currently there), holding: account info (display
@@ -349,18 +384,18 @@ their own terms, offline, and have it sync.*
 The numbering above (§2.4/§2.5 before M3/M4) reflects **dependency order** and stays as the
 canonical reference for *what depends on what*. The actual **build order** diverges from it.
 
-**Revised build order (2026-06-18, updated):**
+**Revised build order (2026-06-18, updated — added §4.0d):**
 
 ```
 §2.3 (done) → §3.1 (done) → §4.0 (done) → §2.3a (done) → §2.3b (done) → §2.3c (done) →
-§2.2d (done) → §2.3d (done) → §4.0b (done) → §2.6 → §2.7 → §4.0c → §2.8 → §2.9 →
+§2.2d (done) → §2.3d (done) → §4.0b (done) → §2.6 (done) → §2.7 → §4.0c → §2.8 → §4.0d → §2.9 →
 §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 → §2.5 → M5
 ```
 
-**§2.6/§2.7/§4.0c/§2.8/§2.9 (added 2026-06-18, owner-requested core-UX hardening before
-store-matching)** — the Owner wants list management, item/product detail management, and
-a Profile screen fully solid **before** any store-offer matching work (§3.2 onward) begins.
-Inserted as a block right after §4.0b:
+**§2.6/§2.7/§4.0c/§2.8/§4.0d/§2.9 (added 2026-06-18, owner-requested core-UX hardening
+before store-matching)** — the Owner wants list management, item/product detail
+management, Catalog product management, and a Profile screen fully solid **before** any
+store-offer matching work (§3.2 onward) begins. Inserted as a block right after §4.0b:
 
 - **§2.6 (delete list) / §2.7 (rename list)** close the two missing list-management gaps
   found by audit (no delete, no rename anywhere in the UI/API today).
@@ -372,12 +407,20 @@ Inserted as a block right after §4.0b:
   cosmetic, so it's sequenced deliberately rather than folded into §2.8.
 - **§2.8 (item detail screens)** replaces the literal "Expand details soon" placeholder
   with real UserProduct/StoreProduct detail views.
+- **§4.0d (Catalog bucket detail, added 2026-06-18)** turns the Catalog tab from
+  read-only taxonomy browse into the owner's own product/item manager, grouped by
+  bucket — create/edit/archive/add-to-list from there. Sequenced *after* §2.8 because it
+  reuses §2.8's detail screens for editing, and after §4.0c because it needs the manual-
+  StoreProduct create path. This **amends** the 2026-06-17 "Catalog has no connection to
+  list-adding" rule — see `decisions.md` "Resolved — Catalog becomes 'browse my
+  products'" (2026-06-18) for the full rationale.
 - **§2.9 (Profile screen)** consolidates the theme toggle + logout (currently loose in
   `ListsScreen`'s app bar) into one screen, with account info — no family management yet
   (`decisions.md` "Resolved — Profile screen, v1 scope," 2026-06-18).
 
 This block sits **before** §3.2 (ingestion) — the Owner's explicit ordering: core list/
-item/profile UX should work end-to-end before store-offer comparison is layered on top.
+item/Catalog/profile UX should work end-to-end before store-offer comparison is layered
+on top.
 
 **§2.3d (added 2026-06-17, immediately after §2.2d)** — found while verifying §2.2d on
 shopping.flux.bg: same-account, different-browser sessions showed different lists. Root
@@ -412,11 +455,12 @@ fresh, and because §3.2 (ingestion) doesn't need it first.
 - **§4.0 (done)** — navigation shell + Add/Search screen first. Pure frontend, no dependency
   on offers or ingestion. Gets the Owner a real second screen immediately.
 - **§4.0b (done)** — revised that nav shell per the Owner's 2026-06-17 request.
-- **§2.6 → §2.7 → §4.0c → §2.8 → §2.9 (next)** — core list/item/profile UX hardening,
-  inserted 2026-06-18 at the Owner's explicit request, **before** any store-matching work.
-  List delete/rename close real UI gaps; §4.0c adds the direct-StoreProduct list path and
-  its schema; §2.8 gives every list item a real detail screen of its actual type; §2.9
-  ships a Profile screen. See the block note above for why each is sequenced where it is.
+- **§2.6 (done) → §2.7 (next) → §4.0c → §2.8 → §4.0d → §2.9** — core list/item/Catalog/
+  profile UX hardening, inserted 2026-06-18 at the Owner's explicit request, **before**
+  any store-matching work. List delete/rename close real UI gaps; §4.0c adds the direct-
+  StoreProduct list path and its schema; §2.8 gives every list item a real detail screen
+  of its actual type; §4.0d turns Catalog into a product/item manager; §2.9 ships a
+  Profile screen. See the block note above for why each is sequenced where it is.
 - **§3.2 → §3.3 (after the above, before §4.1)** — IngestionService and cron, once core UX
   is solid. When §4.1 ships, there will already be real offers in the DB from the crawler
   — the Owner sees real prices from day one, not an empty state.

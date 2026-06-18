@@ -424,6 +424,56 @@ represented "under" an artificial UserProduct term. Closed as follows:
   with `user_products.is_archived` soft-delete already protecting term
   history). (`04` §4.3)
 
+### Resolved — Catalog becomes "browse my products" (amends the 2026-06-17 bottom-nav rule) (2026-06-18)
+
+The owner wants the Catalog tab to be more than a read-only taxonomy browse: it
+should let the owner manage their own UserProduct/StoreProduct inventory, grouped
+by category bucket, and add to a list directly from there. This **amends** (does
+not retire) the 2026-06-17 resolution "Bottom navigation becomes destinations, not
+actions" — specifically the clause "[Catalog has] no prices, no offers, and no
+connection to list-adding." Closed as follows:
+
+- [x] **Category buckets themselves stay exactly as built in §4.0b** — the flat
+  list of ~20-30 seeded buckets (`GET /categories`), fixed/shared taxonomy. A
+  bucket **cannot be created, edited, or deleted by a user** — only an admin
+  merge/split survives as catalog hygiene (D §4, unchanged). This part of the
+  2026-06-17 rule is **not** amended.
+- [x] **Tapping a bucket now opens a bucket-detail view** showing the owner's own
+  UserProduct terms and StoreProduct items already attached to that bucket
+  (`category_id` match) — empty if the owner has nothing there yet. **Owner-
+  scoped** (D §9's existing owner-context rule, the same one already governing
+  favorites/recent/frequent): shows the logged-in user's own records **and**
+  the records of any family the user belongs to, once `§2.4` ships a backend —
+  **never** another, unrelated user's records. Until `§2.4` ships, this is
+  simply "the logged-in user's own records" (no family filter exists yet to
+  apply) — built now on that narrower scope, family-widening is additive when
+  `§2.4` lands, not a redesign.
+- [x] **From the bucket-detail view, the owner can:** create a new UserProduct/
+  StoreProduct directly into that bucket (same create paths as Add/Search §4.0
+  and the manual-StoreProduct flow §4.0c, just entered from Catalog instead of
+  a list's `+`), edit (§2.8's detail screens), archive (`is_archived` soft-
+  delete for UserProduct; an equivalent flag for StoreProduct — see below), and
+  add the record to any of the owner's lists. **This does reopen "no global
+  product-catalog picker" only to the extent of the owner's own/family records**
+  — it remains true that no one ever browses a stranger's terms; "no global
+  catalog" meant "no shared catalog of everyone's products," which still holds.
+- [x] **Archiving from Catalog while the record is still on an active list is
+  blocked** (recommended by the owner) — the archive action is disabled/shows
+  why, with a prompt to remove it from its list(s) first (the existing
+  `onRemoveItem` / `§2.6` list-delete affordances already cover that). This
+  mirrors the existing `RESTRICT` FK behaviour (`list_items.user_product_id`/
+  `store_product_id` → `ON DELETE RESTRICT`, `04` §4.3) at the UX layer instead
+  of surfacing a raw DB error.
+- [x] **StoreProduct gains an `is_archived` flag**, mirroring `user_products.is_archived`
+  (`04` §4.3) — needed now that StoreProduct rows are independently manageable
+  from Catalog, not just attached to a list. Same soft-delete rationale: history
+  (`purchase_log` snapshot columns referencing `store_product_id`) survives.
+- [x] **A UserProduct/StoreProduct becomes visible in its bucket's Catalog detail
+  the moment it's categorized — regardless of whether it's on any list.**
+  Category attachment (not list membership) drives Catalog visibility; adding
+  something to a list and adding it from Catalog both result in the same
+  underlying row, so both surfaces always agree.
+
 ### Resolved — Profile screen, v1 scope (2026-06-18)
 
 - [x] **Profile screen v1** = account info (display name, email) + the

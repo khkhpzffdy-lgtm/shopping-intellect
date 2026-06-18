@@ -364,6 +364,7 @@ same row instead of duplicating it.
 |`brand_normalized`         |`VARCHAR(120) NULL`       |best-effort extracted brand token; powers brand-anchored comparison (§7.2)                                                      |
 |`image_url`                |`VARCHAR(512) NULL`       |optional product photo (crawled thumbnail, or user-supplied for a manual item)                                                  |
 |`source_url`               |`VARCHAR(512) NULL`       |audit/back-link; NULL for user-born rows                                                                                        |
+|`is_archived`              |`TINYINT(1) NOT NULL DEFAULT 0`|soft-delete, mirrors `user_products.is_archived` (D §14 "Catalog becomes 'browse my products'," 2026-06-18) — needed once StoreProduct rows are independently manageable from Catalog, not just attached via a list|
 |`created_at` / `updated_at`|`DATETIME NOT NULL`       |                                                                                                                                |
 
 - **PK** `id`. **FK** `store_id` → `stores.id`; **FK** `category_id` → `categories.id`

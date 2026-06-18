@@ -49,3 +49,15 @@ export const TrashIcon = () => (
     />
   </svg>
 );
+
+export const EditIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none">
+    <path
+      d="M4 20l1-4.5L15.5 5 19 8.5 8.5 19 4 20z M13.5 6.5 17.5 10.5"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);

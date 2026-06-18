@@ -846,13 +846,13 @@ test('renaming a list from the app bar saves immediately and persists after relo
   const view = renderApp();
 
   await userEvent.click(await screen.findByRole('button', { name: 'Original name 0 items' }));
-  await userEvent.click(await screen.findByRole('button', { name: 'Original name' }));
+  await userEvent.click(await screen.findByRole('button', { name: 'Rename list' }));
 
   const input = screen.getByLabelText('List name');
   await userEvent.clear(input);
   await userEvent.type(input, 'Renamed{Enter}');
 
-  expect(await screen.findByRole('button', { name: 'Renamed' })).toBeInTheDocument();
+  expect(await screen.findByText('Renamed')).toBeInTheDocument();
   await waitFor(() => {
     expect(mockFetch.mock.calls.some(([input]) => (typeof input === 'string' ? input : (input as Request).url).endsWith('/lists/960'))).toBe(true);
   });
@@ -861,7 +861,7 @@ test('renaming a list from the app bar saves immediately and persists after relo
   renderApp();
 
   await userEvent.click(await screen.findByRole('button', { name: 'Renamed 0 items' }));
-  expect(await screen.findByRole('button', { name: 'Renamed' })).toBeInTheDocument();
+  expect(await screen.findByText('Renamed')).toBeInTheDocument();
 });
 
 test('renaming a list while offline updates the title immediately and keeps it after reconnect', async () => {
@@ -886,13 +886,13 @@ test('renaming a list while offline updates the title immediately and keeps it a
   renderApp();
 
   await userEvent.click(await screen.findByRole('button', { name: 'Offline original 0 items' }));
-  await userEvent.click(await screen.findByRole('button', { name: 'Offline original' }));
+  await userEvent.click(await screen.findByRole('button', { name: 'Rename list' }));
 
   const input = screen.getByLabelText('List name');
   await userEvent.clear(input);
   await userEvent.type(input, 'Offline renamed{Enter}');
 
-  expect(await screen.findByRole('button', { name: 'Offline renamed' })).toBeInTheDocument();
+  expect(await screen.findByText('Offline renamed')).toBeInTheDocument();
 
   Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
   mockFetch.mockImplementation((input) => {
@@ -908,7 +908,7 @@ test('renaming a list while offline updates the title immediately and keeps it a
     expect(mockFetch.mock.calls.some(([input]) => (typeof input === 'string' ? input : (input as Request).url).endsWith('/lists/961'))).toBe(true);
   });
 
-  expect(screen.getByRole('button', { name: 'Offline renamed' })).toBeInTheDocument();
+  expect(screen.getByText('Offline renamed')).toBeInTheDocument();
 });
 
 test('saving a blank list name does not wipe out the existing name', async () => {
@@ -934,13 +934,13 @@ test('saving a blank list name does not wipe out the existing name', async () =>
   renderApp();
 
   await userEvent.click(await screen.findByRole('button', { name: 'Keep me 0 items' }));
-  await userEvent.click(await screen.findByRole('button', { name: 'Keep me' }));
+  await userEvent.click(await screen.findByRole('button', { name: 'Rename list' }));
 
   const input = screen.getByLabelText('List name');
   await userEvent.clear(input);
   await userEvent.type(input, '   {Enter}');
 
-  expect(await screen.findByRole('button', { name: 'Keep me' })).toBeInTheDocument();
+  expect(await screen.findByText('Keep me')).toBeInTheDocument();
   expect(
     mockFetch.mock.calls.some(([input, init]) => {
       const url = typeof input === 'string' ? input : (input as Request).url;

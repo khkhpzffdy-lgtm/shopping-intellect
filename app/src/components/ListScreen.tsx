@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ListItemView, ShoppingListRecord } from '../storage/db';
 import { useListModeStore } from '../store/listMode';
+import { EditIcon } from './icons';
 import { SyncStatusIndicator } from './SyncStatusIndicator';
 
 type ListScreenProps = {
@@ -77,17 +78,20 @@ export const ListScreen = ({
             }}
           />
         ) : (
-          <button
-            type="button"
-            className="appbar__title"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-            onClick={() => {
-              setNameDraft(list.name);
-              setEditingName(true);
-            }}
-          >
-            {list.name}
-          </button>
+          <>
+            <div className="appbar__title">{list.name}</div>
+            <button
+              type="button"
+              className="iconbtn"
+              aria-label="Rename list"
+              onClick={() => {
+                setNameDraft(list.name);
+                setEditingName(true);
+              }}
+            >
+              <EditIcon />
+            </button>
+          </>
         )}
         <button type="button" onClick={onOpenAddSearch} className="iconbtn" aria-label="Search">
           🔍

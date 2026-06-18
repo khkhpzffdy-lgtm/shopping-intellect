@@ -139,7 +139,7 @@ export const ListsScreen = ({
 
       {lists.length === 0 ? <EmptyState context="no-lists" onCreate={() => setCreating(true)} /> : null}
 
-      <div className="grid gap-3">
+      <div className="grid gap-3" style={{ gridTemplateColumns: '1fr' }}>
         {lists.map((list) => (
           <div key={list.client_uuid} className="listcard">
             <button type="button" onClick={() => onOpenList(list.client_uuid)} className="listcard__open">

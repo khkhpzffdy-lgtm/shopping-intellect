@@ -37,3 +37,15 @@ export const SyncFailedIcon = () => (
     <circle cx="12" cy="17" r="1" fill="currentColor" />
   </svg>
 );
+
+export const TrashIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none">
+    <path
+      d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);

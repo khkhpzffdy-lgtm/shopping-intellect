@@ -3,21 +3,35 @@ import { getList, markMutationDone, markMutationFailed, type MutationQueueRecord
 import { applyMutationSuccess } from './applyMutationSuccess';
 
 export const resolveEndpoint = async (mutation: MutationQueueRecord) => {
-  if (mutation.method !== 'POST') {
-    return mutation.endpoint;
+  if (mutation.method === 'POST') {
+    const itemMatch = mutation.endpoint.match(/^\/lists\/([^/]+)\/items$/);
+    if (!itemMatch) {
+      return mutation.endpoint;
+    }
+
+    const list = await getList(itemMatch[1]);
+    if (!list?.id) {
+      return mutation.endpoint;
+    }
+
+    return `/lists/${list.id}/items`;
   }
 
-  const itemMatch = mutation.endpoint.match(/^\/lists\/([^/]+)\/items$/);
-  if (!itemMatch) {
-    return mutation.endpoint;
+  if (mutation.method === 'DELETE') {
+    const listMatch = mutation.endpoint.match(/^\/lists\/([^/]+)$/);
+    if (!listMatch) {
+      return mutation.endpoint;
+    }
+
+    const list = await getList(listMatch[1]);
+    if (!list?.id) {
+      return mutation.endpoint;
+    }
+
+    return `/lists/${list.id}`;
   }
 
-  const list = await getList(itemMatch[1]);
-  if (!list?.id) {
-    return mutation.endpoint;
-  }
-
-  return `/lists/${list.id}/items`;
+  return mutation.endpoint;
 };
 
 export const sendMutation = async (mutation: MutationQueueRecord): Promise<void> => {

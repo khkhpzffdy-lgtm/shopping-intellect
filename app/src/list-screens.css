@@ -135,10 +135,14 @@
 
 /* ---- Lists overview ---- */
 .si-root .listcard {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  width: 100%; text-align: left; padding: 16px;
+  display: flex; align-items: center; gap: 4px;
+  width: 100%; padding: 4px;
   background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
-  cursor: pointer;
+}
+.si-root .listcard__open {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex: 1; min-width: 0; text-align: left; padding: 12px;
+  background: none; border: none; cursor: pointer;
 }
 .si-root .listcard__name { font-size: var(--fs-h1); font-weight: 600; color: var(--ink); }
 .si-root .listcard__meta { margin-top: 6px; font-size: var(--fs-body); color: var(--ink-2); }

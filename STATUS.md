@@ -127,6 +127,7 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 | §2.2d | UI consistency cleanup: `EmptyState` wired + translated, one-language copy pass, list-screen search icon → Add/Search | ✅ done |
 | §2.3d | Pull lists/items from server on boot — fixes "different browsers, same account, different lists" | ✅ done |
 | §4.0b | Catalog tab + move Add/Search off the bottom nav | ✅ done |
+| §2.6 | Delete a list (hard delete, items/terms survive) | ✅ done |
 
 **App (`app/`):** Vite + React PWA, FTP deploy wired. Implemented so far:
 - `AuthScreen` — register/login screen, working against the plugin's auth endpoints
@@ -393,12 +394,64 @@ slice (the `categories` table and its seed already existed from `§0.4`), so no
 deactivate/reactivate step is required — `GET /categories` should work immediately once the
 plugin's `main` branch FTP-deploys.
 
-**Build order (2026-06-17, revised same day):** §3.1 (done) → §4.0 (done) → §2.3a (done) → §2.3b (done) → §2.3c (done)
-→ §2.2d (done) → §2.3d (done) → **§4.0b (done)** → §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 (Family) → §2.5 (Favorites) → M5.
-Rationale: §4.0 is pure frontend with no DB dependency. §3.2/§3.3 (ingestion + cron) follow
-immediately so real offers are in the DB before §4.1 ships — the Owner sees real prices from
-day one, not empty state. §2.3a/§2.3b/§2.3c jumped the queue ahead of §2.2d same day — see incident
-note immediately below. See `13-implementation-line.md` "Re-sequencing" for full reasoning.
+**Build order (2026-06-18, revised):** §3.1 (done) → §4.0 (done) → §2.3a (done) → §2.3b (done) → §2.3c (done)
+→ §2.2d (done) → §2.3d (done) → §4.0b (done) → §2.6 (done) → **§2.7 (next) → §4.0c → §2.8 → §2.9** →
+§3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 (Family) → §2.5 (Favorites) → M5.
+**2026-06-18 re-sequencing:** the Owner asked for list management (delete/rename), item/
+product detail management, and a Profile screen to be fully solid **before** any
+store-offer matching work starts — so §2.6/§2.7/§4.0c/§2.8/§2.9 (new Slices, see
+`13-implementation-line.md`) are inserted ahead of §3.2. §4.0c is also a real schema/iron-
+rule amendment: `list_items` can now reference a `StoreProduct` directly (a specific item,
+e.g. "Мляко Данон 2% 1л"), not just a `UserProduct` (a broad term, "мляко") — see
+`decisions.md` "Resolved — list_items can target a specific StoreProduct directly"
+(2026-06-18) for the full rationale and schema delta (`list_items.store_product_id`,
+`store_products.source`/`created_by_user_id`/`image_url`). §3.2/§3.3 (ingestion + cron)
+still follow immediately after, so real offers are in the DB before §4.1 ships. §2.3a/
+§2.3b/§2.3c jumped the queue ahead of §2.2d on 2026-06-17 — see incident note immediately
+below. See `13-implementation-line.md` "Re-sequencing" for full reasoning.
+
+**§2.6 is done (2026-06-18).** Delete a list (hard delete, items/terms survive). **Backend
+(plugin repo):** `ListRepositoryInterface` gained `delete(int $id): bool`;
+`WpdbListRepository::delete()` runs a prepared `DELETE FROM {prefix}lists WHERE id = %d`,
+returns whether a row was affected — it does not touch `list_items`/`user_products` itself,
+relying on the existing `list_items.list_id` `ON DELETE CASCADE` FK (`04-database.md` §4.3,
+already in the schema) and the `RESTRICT` FK on `user_product_id`/`store_product_id` to keep
+those rows untouched. `ListService::deleteList(int $userId, int $listId)` reuses
+`findOwnedList` for the ownership check, returns `false` for not-found/not-owned.
+`ListController` gained `DELETE /lists/{id}` → `handleDeleteList`, 204 on success, the
+existing 404 `not_found` error otherwise. The PHPUnit `SqliteWpdb` test stub didn't enforce
+real FKs before this slice (no `PRAGMA foreign_keys`, no `FOREIGN KEY` clauses on
+`si_list_items`) — added both so `WpdbListRepositoryTest`'s new delete-cascade test is a real
+regression guard, not a tautology. New tests: `WpdbListRepositoryTest::testDeleteRemoves...`
+(cascade + user_product survival), `::testDeleteReturnsFalseForUnknownList`,
+`ListControllerTest::testHandleDeleteListRemoves...`,
+`::testHandleDeleteListReturns404ForUnknownOrUnownedList`. All 94 PHPUnit tests pass.
+**Frontend (app repo):** `db.ts` gained `deleteList(listKey)` (removes the list row and any
+`list_items` rows referencing it, mirroring the server cascade locally). `sendMutation.ts`'s
+`resolveEndpoint` gained a `DELETE` branch parallel to the existing `POST .../items` one,
+matching bare `/lists/{clientUuid}` and resolving to `/lists/{realServerId}` via `getList`
+once known, else falling back to the literal endpoint. `ListsScreen.tsx`'s `.listcard` is no
+longer itself a `<button>` (can't nest a delete `<button>` inside one) — it's now a wrapper
+`<div>` containing a `.listcard__open` button (the original open-list click target, same
+visual layout via updated CSS in `list-screens.css`) plus a new trash-icon `.iconbtn` (new
+`TrashIcon` in `icons.tsx`) that confirms via `window.confirm` before calling the new
+`onDeleteList` prop. `HomeScreen.tsx`'s new `handleDeleteList` follows the exact optimistic-
+local → enqueue → `markMutationInFlight` + `sendMutation` shape as `handleRemoveItem`/
+`handleCreateList`. New tests: `db.test.ts` (`deleteList` removes list + items),
+`sendMutation.test.ts` (`resolveEndpoint` DELETE branch, both the resolved and
+not-yet-known-server-id cases), two new `App.test.tsx` cases (online delete-with-confirm
+survives reload; offline delete queues and applies once back online) — all pass in
+isolation. `npx tsc --noEmit` and `npm run build` both pass. **Note:** adding a second test
+to `db.test.ts`/`sendMutation.test.ts` that both call `clearDatabase()` reproduces the same
+pre-existing `fake-indexeddb` hook-timeout flakiness already flagged in the §2.3c/§2.2d/
+§2.3d/§4.0b entries above — confirmed via `git stash` that this exact hang already happens
+on `main` before this slice's changes (e.g. `sendMutation.test.ts`'s original two tests hang
+when run together). Root cause looks like `db.ts`'s `getDb()` never closing/reusing IndexedDB
+connections across calls, so a later `deleteDB` in the same process can block on a still-open
+handle from an earlier test — worth a real fix (singleton connection + explicit `close()`) in
+a future slice, out of scope here. All new/changed test files pass when run individually or
+alongside the other unaffected files, matching the verification bar used in every prior
+"flaky in this sandbox" note above. Pushed to `main` in both repos.
 
 **2026-06-17 production incident — sync pipeline, four stacked bugs.** Every list/item was stuck
 `sync-pending` forever. Root-caused and fixed live (outside the normal Slice flow, by explicit

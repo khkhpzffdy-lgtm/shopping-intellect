@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ShoppingListRecord } from '../storage/db';
 import { EmptyState } from './EmptyState';
 import { SyncStatusIndicator } from './SyncStatusIndicator';
+import { TrashIcon } from './icons';
 
 type ListsScreenProps = {
   lists: ShoppingListRecord[];
@@ -12,6 +13,7 @@ type ListsScreenProps = {
   onCreateNameChange: (value: string) => void;
   onCreateList: () => void;
   onOpenList: (listKey: string) => void;
+  onDeleteList: (listKey: string) => void;
   theme: 'light' | 'dark';
   onSetTheme: (theme: 'light' | 'dark') => void;
   onLogout: () => void;
@@ -26,6 +28,7 @@ export const ListsScreen = ({
   onCreateNameChange,
   onCreateList,
   onOpenList,
+  onDeleteList,
   theme,
   onSetTheme,
   onLogout
@@ -138,16 +141,30 @@ export const ListsScreen = ({
 
       <div className="grid gap-3">
         {lists.map((list) => (
-          <button key={list.client_uuid} type="button" onClick={() => onOpenList(list.client_uuid)} className="listcard">
-            <div>
-              <h2 className="listcard__name">{list.name}</h2>
-              <p className="listcard__meta">{itemCounts[list.client_uuid] ?? 0} items</p>
-            </div>
-            <SyncStatusIndicator
-              pending={mutationStatusCounts[list.client_uuid]?.pending ?? 0}
-              failed={mutationStatusCounts[list.client_uuid]?.failed ?? 0}
-            />
-          </button>
+          <div key={list.client_uuid} className="listcard">
+            <button type="button" onClick={() => onOpenList(list.client_uuid)} className="listcard__open">
+              <div>
+                <h2 className="listcard__name">{list.name}</h2>
+                <p className="listcard__meta">{itemCounts[list.client_uuid] ?? 0} items</p>
+              </div>
+              <SyncStatusIndicator
+                pending={mutationStatusCounts[list.client_uuid]?.pending ?? 0}
+                failed={mutationStatusCounts[list.client_uuid]?.failed ?? 0}
+              />
+            </button>
+            <button
+              type="button"
+              className="iconbtn"
+              aria-label={`Изтрий ${list.name}`}
+              onClick={() => {
+                if (window.confirm(`Изтрий списъка "${list.name}"? Това действие е необратимо.`)) {
+                  onDeleteList(list.client_uuid);
+                }
+              }}
+            >
+              <TrashIcon />
+            </button>
+          </div>
         ))}
       </div>
     </section>

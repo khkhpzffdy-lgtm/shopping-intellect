@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { clearDatabase, enqueueMutation, getMutation, putList } from '../storage/db';
 import { flushQueuedMutations } from '../sync/flush';
-import { sendMutation } from '../sync/sendMutation';
+import { resolveEndpoint, sendMutation } from '../sync/sendMutation';
 
 vi.mock('../sync/sendMutation', async () => {
   const actual = await vi.importActual<typeof import('../sync/sendMutation')>('../sync/sendMutation');
@@ -86,5 +86,48 @@ describe('sendMutation is the single dispatch path', () => {
 
     expect(result).toEqual({ failed: 0, processed: 1, succeeded: 1 });
     expect(await getMutation('list-c')).toMatchObject({ status: 'in_flight' });
+  });
+});
+
+describe('resolveEndpoint resolves a queued list-delete mutation to the real server id', () => {
+  beforeEach(async () => {
+    await clearDatabase();
+  });
+
+  test('resolves /lists/{clientUuid} to /lists/{serverId} once the list has synced', async () => {
+    await putList({
+      client_uuid: 'list-d',
+      id: '99',
+      name: 'D',
+      owner_type: 'user',
+      owner_id: 1,
+      updated_at: '2026-06-17T10:03:00.000Z'
+    });
+
+    const endpoint = await resolveEndpoint({
+      client_uuid: 'mut-delete-list-d',
+      endpoint: '/lists/list-d',
+      method: 'DELETE',
+      created_at: '2026-06-17T10:03:00.000Z',
+      attempts: 0,
+      status: 'pending',
+      entity_client_uuid: 'list-d'
+    });
+
+    expect(endpoint).toBe('/lists/99');
+  });
+
+  test('falls back to the literal endpoint if no server id is known yet', async () => {
+    const endpoint = await resolveEndpoint({
+      client_uuid: 'mut-delete-list-e',
+      endpoint: '/lists/list-e',
+      method: 'DELETE',
+      created_at: '2026-06-17T10:04:00.000Z',
+      attempts: 0,
+      status: 'pending',
+      entity_client_uuid: 'list-e'
+    });
+
+    expect(endpoint).toBe('/lists/list-e');
   });
 });

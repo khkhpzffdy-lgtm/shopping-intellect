@@ -5,6 +5,7 @@ import { sendMutation } from '../sync/sendMutation';
 import { useAuthStore } from '../store/auth';
 import { useThemeStore } from '../store/theme';
 import {
+  deleteList,
   deleteListItem,
   enqueueMutation,
   getListItems,
@@ -395,6 +396,43 @@ export const HomeScreen = () => {
     }
   };
 
+  const handleDeleteList = async (listKey: string) => {
+    const list = lists.find((candidate) => candidate.client_uuid === listKey);
+    if (!list) {
+      return;
+    }
+
+    await deleteList(listKey);
+
+    if (!list.id) {
+      await removeQueuedMutationsForEntity(list.client_uuid);
+      await refreshLists();
+      return;
+    }
+
+    const mutationUuid = generateUuid();
+    await enqueueMutation({
+      client_uuid: mutationUuid,
+      endpoint: `/lists/${list.id}`,
+      method: 'DELETE',
+      created_at: new Date().toISOString(),
+      attempts: 0,
+      status: 'pending',
+      entity_client_uuid: list.client_uuid
+    });
+    await refreshLists();
+
+    try {
+      const claimedMutation = await markMutationInFlight(mutationUuid);
+      if (claimedMutation) {
+        await sendMutation(claimedMutation);
+      }
+      await refreshLists();
+    } catch {
+      // Keep the delete queued.
+    }
+  };
+
   return (
     <main className="min-h-screen px-4 py-6 md:px-8" style={{ background: 'var(--bg)' }}>
       <div className="mx-auto max-w-3xl space-y-4">
@@ -422,6 +460,7 @@ export const HomeScreen = () => {
             onCreateNameChange={setCreateName}
             onCreateList={handleCreateList}
             onOpenList={setSelectedListKey}
+            onDeleteList={handleDeleteList}
             theme={theme}
             onSetTheme={setTheme}
             onLogout={handleLogout}

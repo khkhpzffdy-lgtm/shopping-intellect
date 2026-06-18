@@ -723,3 +723,93 @@ test('boot offline (GET /lists rejects) still renders local-first data without a
   expect(await screen.findByRole('button', { name: /Cached locally/i })).toBeInTheDocument();
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
+
+test('deleting a list asks for confirmation, removes it immediately, and it survives a reload', async () => {
+  useAuthStore.getState().setSession({
+    accessToken: makeToken({ user_id: 15, family_ids: [], display_name: 'Mira' }),
+    expiresIn: 900,
+    user: { id: 15, displayName: 'Mira', familyIds: [] }
+  });
+
+  await putList({
+    client_uuid: 'delete-list-uuid-1',
+    id: '950',
+    name: 'To delete',
+    owner_type: 'user',
+    owner_id: 15,
+    updated_at: '2026-06-18T00:00:00.000Z'
+  });
+
+  const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  mockFetch.mockImplementation((input) => {
+    const url = typeof input === 'string' ? input : (input as Request).url;
+    if (url.endsWith('/lists/950')) {
+      return Promise.resolve(new Response(null, { status: 204 }));
+    }
+    return Promise.resolve(new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+  });
+
+  const view = renderApp();
+
+  expect(await screen.findByRole('button', { name: 'To delete 0 items' })).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Изтрий To delete' }));
+
+  expect(confirmSpy).toHaveBeenCalled();
+  await waitFor(() => {
+    expect(screen.queryByRole('button', { name: 'To delete 0 items' })).not.toBeInTheDocument();
+  });
+
+  view.unmount();
+  renderApp();
+
+  expect(await screen.findByText('Все още нямаш списъци')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'To delete 0 items' })).not.toBeInTheDocument();
+
+  confirmSpy.mockRestore();
+});
+
+test('deleting a list while offline removes it immediately and it stays deleted once back online', async () => {
+  useAuthStore.getState().setSession({
+    accessToken: makeToken({ user_id: 16, family_ids: [], display_name: 'Plamen' }),
+    expiresIn: 900,
+    user: { id: 16, displayName: 'Plamen', familyIds: [] }
+  });
+
+  await putList({
+    client_uuid: 'delete-list-uuid-2',
+    id: '951',
+    name: 'Offline delete',
+    owner_type: 'user',
+    owner_id: 16,
+    updated_at: '2026-06-18T00:00:00.000Z'
+  });
+
+  Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+  const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  mockFetch.mockRejectedValue(new TypeError('Failed to fetch'));
+
+  renderApp();
+
+  expect(await screen.findByRole('button', { name: 'Offline delete 0 items' })).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Изтрий Offline delete' }));
+
+  await waitFor(() => {
+    expect(screen.queryByRole('button', { name: 'Offline delete 0 items' })).not.toBeInTheDocument();
+  });
+
+  Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
+  mockFetch.mockImplementation((input) => {
+    const url = typeof input === 'string' ? input : (input as Request).url;
+    if (url.endsWith('/lists/951')) {
+      return Promise.resolve(new Response(null, { status: 204 }));
+    }
+    return Promise.resolve(new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+  });
+  window.dispatchEvent(new Event('online'));
+
+  await waitFor(() => {
+    expect(mockFetch.mock.calls.some(([input]) => (typeof input === 'string' ? input : (input as Request).url).endsWith('/lists/951'))).toBe(true);
+  });
+
+  confirmSpy.mockRestore();
+});

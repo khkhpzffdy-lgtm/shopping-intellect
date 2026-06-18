@@ -93,6 +93,18 @@ export const putList = async (list: ShoppingListRecord) => {
   await db.put('lists', list);
 };
 
+export const deleteList = async (listKey: string) => {
+  const db = await getDb();
+  const list = await getList(listKey);
+  const items = await db.getAll('list_items');
+  await Promise.all(
+    items
+      .filter((item) => item.list_client_uuid === listKey || item.list_id === listKey)
+      .map((item) => db.delete('list_items', item.client_uuid))
+  );
+  await db.delete('lists', list?.client_uuid ?? listKey);
+};
+
 export const touchListUpdatedAt = async (clientUuid: string, updatedAt: string) => {
   const db = await getDb();
   const current = await db.get('lists', clientUuid);

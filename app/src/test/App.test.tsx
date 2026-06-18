@@ -751,19 +751,19 @@ test('deleting a list asks for confirmation, removes it immediately, and it surv
 
   const view = renderApp();
 
-  expect(await screen.findByRole('button', { name: 'To delete 0 items' })).toBeInTheDocument();
+  expect(await screen.findByText('To delete')).toBeInTheDocument();
   await userEvent.click(screen.getByRole('button', { name: 'Изтрий To delete' }));
 
   expect(confirmSpy).toHaveBeenCalled();
   await waitFor(() => {
-    expect(screen.queryByRole('button', { name: 'To delete 0 items' })).not.toBeInTheDocument();
+    expect(screen.queryByText('To delete')).not.toBeInTheDocument();
   });
 
   view.unmount();
   renderApp();
 
   expect(await screen.findByText('Все още нямаш списъци')).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'To delete 0 items' })).not.toBeInTheDocument();
+  expect(screen.queryByText('To delete')).not.toBeInTheDocument();
 
   confirmSpy.mockRestore();
 });
@@ -790,11 +790,11 @@ test('deleting a list while offline removes it immediately and it stays deleted 
 
   renderApp();
 
-  expect(await screen.findByRole('button', { name: 'Offline delete 0 items' })).toBeInTheDocument();
+  expect(await screen.findByText('Offline delete')).toBeInTheDocument();
   await userEvent.click(screen.getByRole('button', { name: 'Изтрий Offline delete' }));
 
   await waitFor(() => {
-    expect(screen.queryByRole('button', { name: 'Offline delete 0 items' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Offline delete')).not.toBeInTheDocument();
   });
 
   Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
@@ -845,7 +845,7 @@ test('renaming a list from the app bar saves immediately and persists after relo
 
   const view = renderApp();
 
-  await userEvent.click(await screen.findByRole('button', { name: 'Original name 0 items' }));
+  await userEvent.click(await screen.findByRole('button', { name: 'Отвори Original name' }));
   await userEvent.click(await screen.findByRole('button', { name: 'Rename list' }));
 
   const input = screen.getByLabelText('List name');
@@ -860,7 +860,7 @@ test('renaming a list from the app bar saves immediately and persists after relo
   view.unmount();
   renderApp();
 
-  await userEvent.click(await screen.findByRole('button', { name: 'Renamed 0 items' }));
+  await userEvent.click(await screen.findByRole('button', { name: 'Отвори Renamed' }));
   expect(await screen.findByText('Renamed')).toBeInTheDocument();
 });
 
@@ -885,7 +885,7 @@ test('renaming a list while offline updates the title immediately and keeps it a
 
   renderApp();
 
-  await userEvent.click(await screen.findByRole('button', { name: 'Offline original 0 items' }));
+  await userEvent.click(await screen.findByRole('button', { name: 'Отвори Offline original' }));
   await userEvent.click(await screen.findByRole('button', { name: 'Rename list' }));
 
   const input = screen.getByLabelText('List name');
@@ -933,7 +933,7 @@ test('saving a blank list name does not wipe out the existing name', async () =>
 
   renderApp();
 
-  await userEvent.click(await screen.findByRole('button', { name: 'Keep me 0 items' }));
+  await userEvent.click(await screen.findByRole('button', { name: 'Отвори Keep me' }));
   await userEvent.click(await screen.findByRole('button', { name: 'Rename list' }));
 
   const input = screen.getByLabelText('List name');
@@ -996,7 +996,13 @@ test('renaming a list from the Lists overview (without opening it) saves and doe
   expect(screen.getByText('0 items')).toBeInTheDocument();
 });
 
-test('tapping a list name on the Lists overview still opens the list', async () => {
+// The card uses a full-bleed absolutely-positioned button under the visible content
+// (with pointer-events: none on the static title/meta text) so a tap anywhere except
+// the edit/delete icons opens the list. jsdom's userEvent.click() doesn't emulate real
+// browser click-through for pointer-events: none, so this only exercises the button
+// directly — the click-through behavior itself was verified with a real Chromium
+// instance via Playwright before shipping (see commit history).
+test('tapping anywhere on a Lists overview card opens the list', async () => {
   useAuthStore.getState().setSession({
     accessToken: makeToken({ user_id: 21, family_ids: [], display_name: 'Iliyana' }),
     expiresIn: 900,
@@ -1018,7 +1024,8 @@ test('tapping a list name on the Lists overview still opens the list', async () 
 
   renderApp();
 
-  await userEvent.click(await screen.findByText('Open me'));
+  await screen.findByText('Open me');
+  await userEvent.click(screen.getByRole('button', { name: 'Отвори Open me' }));
 
   expect(await screen.findByRole('button', { name: 'Back' })).toBeInTheDocument();
 });

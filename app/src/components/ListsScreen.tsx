@@ -145,45 +145,41 @@ export const ListsScreen = ({
       <div className="grid gap-3" style={{ gridTemplateColumns: '1fr' }}>
         {lists.map((list) => (
           <div key={list.client_uuid} className="listcard">
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => onOpenList(list.client_uuid)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  onOpenList(list.client_uuid);
-                }
-              }}
-              className="listcard__open"
-            >
-              <div className="listcard__main">
-                <div className="listcard__titlerow">
-                  <RenameableTitle
-                    name={list.name}
-                    onRename={(name) => onRenameList(list.client_uuid, name)}
-                    titleClassName="listcard__name"
-                    renameLabel={`Преименувай ${list.name}`}
-                  />
-                </div>
-                <p className="listcard__meta">{itemCounts[list.client_uuid] ?? 0} items</p>
-              </div>
-              <SyncStatusIndicator
-                pending={mutationStatusCounts[list.client_uuid]?.pending ?? 0}
-                failed={mutationStatusCounts[list.client_uuid]?.failed ?? 0}
-              />
-            </div>
             <button
               type="button"
-              className="iconbtn listcard__delete"
-              aria-label={`Изтрий ${list.name}`}
-              onClick={() => {
-                if (window.confirm(`Изтрий списъка "${list.name}"? Това действие е необратимо.`)) {
-                  onDeleteList(list.client_uuid);
-                }
-              }}
-            >
-              <TrashIcon />
-            </button>
+              onClick={() => onOpenList(list.client_uuid)}
+              className="listcard__open"
+              aria-label={`Отвори ${list.name}`}
+            />
+            <div className="listcard__content">
+              <div className="listcard__titlerow">
+                <RenameableTitle
+                  name={list.name}
+                  onRename={(name) => onRenameList(list.client_uuid, name)}
+                  titleClassName="listcard__name"
+                  renameLabel={`Преименувай ${list.name}`}
+                />
+                <button
+                  type="button"
+                  className="iconbtn listcard__delete"
+                  aria-label={`Изтрий ${list.name}`}
+                  onClick={() => {
+                    if (window.confirm(`Изтрий списъка "${list.name}"? Това действие е необратимо.`)) {
+                      onDeleteList(list.client_uuid);
+                    }
+                  }}
+                >
+                  <TrashIcon />
+                </button>
+              </div>
+              <div className="listcard__metarow">
+                <p className="listcard__meta">{itemCounts[list.client_uuid] ?? 0} items</p>
+                <SyncStatusIndicator
+                  pending={mutationStatusCounts[list.client_uuid]?.pending ?? 0}
+                  failed={mutationStatusCounts[list.client_uuid]?.failed ?? 0}
+                />
+              </div>
+            </div>
           </div>
         ))}
       </div>

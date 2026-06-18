@@ -6,8 +6,10 @@ import {
   getList,
   getListItems,
   getMutationStatusCounts,
+  getStoreProductByClientUuid,
   putList,
-  putListItem
+  putListItem,
+  putStoreProduct
 } from '../storage/db';
 
 beforeEach(async () => {
@@ -66,4 +68,57 @@ test('getMutationStatusCounts produces independent pending/failed counts per ent
 
   expect(counts['entity-a']).toEqual({ pending: 1, failed: 0 });
   expect(counts['entity-b']).toEqual({ pending: 0, failed: 1 });
+});
+
+test('putStoreProduct/getStoreProductByClientUuid round-trips a record', async () => {
+  await putStoreProduct({
+    client_uuid: 'sp-1',
+    id: '9',
+    source: 'user',
+    created_by_user_id: 7,
+    name: 'Мляко Данон 2% 1л',
+    image_url: 'https://example.com/p.jpg',
+    created_at: '2026-06-18T00:00:00.000Z'
+  });
+
+  const found = await getStoreProductByClientUuid('sp-1');
+
+  expect(found?.name).toBe('Мляко Данон 2% 1л');
+  expect(found?.image_url).toBe('https://example.com/p.jpg');
+  expect(found?.source).toBe('user');
+});
+
+test('getListItems resolves the name of a store-product-targeted item', async () => {
+  await putList({
+    client_uuid: 'list-y',
+    id: '6',
+    name: 'Y',
+    owner_type: 'user',
+    owner_id: 1,
+    updated_at: '2026-06-18T00:00:00.000Z'
+  });
+  await putStoreProduct({
+    client_uuid: 'sp-2',
+    id: '10',
+    source: 'user',
+    created_by_user_id: 7,
+    name: 'Мляко Данон 2% 1л',
+    created_at: '2026-06-18T00:00:00.000Z'
+  });
+  await putListItem({
+    client_uuid: 'item-y1',
+    list_client_uuid: 'list-y',
+    list_id: '6',
+    store_product_client_uuid: 'sp-2',
+    store_product_id: '10',
+    quantity: 1,
+    unit: 'piece',
+    is_checked: false,
+    created_at: '2026-06-18T00:00:00.000Z',
+    updated_at: '2026-06-18T00:00:00.000Z'
+  });
+
+  const items = await getListItems('list-y');
+
+  expect(items[0]?.term).toBe('Мляко Данон 2% 1л');
 });

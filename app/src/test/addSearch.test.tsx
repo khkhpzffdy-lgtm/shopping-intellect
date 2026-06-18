@@ -155,6 +155,83 @@ describe('AddSearchScreen — search', () => {
     expect(body?.user_product?.client_uuid).toBeTruthy();
   });
 
+  test('"добави конкретен артикул" shows a form with name required, photo/barcode optional', async () => {
+    mockedApiRequest.mockResolvedValueOnce({ user_products: [] });
+
+    render(<AddSearchScreen selectedList={mockList} onItemAdded={() => {}} />);
+
+    const input = await screen.findByLabelText('Търси термин');
+    await userEvent.type(input, 'мляко данон');
+
+    const addSpecificBtn = await screen.findByTestId('add-specific-item');
+    await userEvent.click(addSpecificBtn);
+
+    expect(await screen.findByTestId('manual-store-product-form')).toBeInTheDocument();
+    expect(screen.getByLabelText('Име на артикула')).toHaveValue('мляко данон');
+    expect(screen.getByLabelText('Снимка (URL)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Баркод')).toBeInTheDocument();
+  });
+
+  test('submitting the manual form posts store_product with name/image and calls onItemAdded', async () => {
+    mockedApiRequest
+      .mockResolvedValueOnce({ user_products: [] })
+      .mockResolvedValueOnce({ item: { id: '102' }, store_product: { id: '77' } });
+
+    const onItemAdded = vi.fn();
+    render(<AddSearchScreen selectedList={mockList} onItemAdded={onItemAdded} />);
+
+    const input = await screen.findByLabelText('Търси термин');
+    await userEvent.type(input, 'мляко данон 2%');
+
+    await userEvent.click(await screen.findByTestId('add-specific-item'));
+    await userEvent.type(screen.getByLabelText('Снимка (URL)'), 'https://example.com/p.jpg');
+    await userEvent.click(screen.getByTestId('manual-store-product-submit'));
+
+    await waitFor(() => expect(onItemAdded).toHaveBeenCalled());
+
+    const postCall = mockedApiRequest.mock.calls.find(
+      (call) => call[0] === '/lists/42/items' && (call[1] as { method?: string })?.method === 'POST'
+    );
+    expect(postCall).toBeDefined();
+    const body = (postCall![1] as { body?: { store_product?: { name?: string; image_url?: string | null; client_uuid?: string } } })?.body;
+    expect(body?.store_product?.name).toBe('мляко данон 2%');
+    expect(body?.store_product?.image_url).toBe('https://example.com/p.jpg');
+    expect(body?.store_product?.client_uuid).toBeTruthy();
+  });
+
+  test('submitting the manual form with a blank name does nothing', async () => {
+    mockedApiRequest.mockResolvedValueOnce({ user_products: [] });
+
+    const onItemAdded = vi.fn();
+    render(<AddSearchScreen selectedList={mockList} onItemAdded={onItemAdded} />);
+
+    const input = await screen.findByLabelText('Търси термин');
+    await userEvent.type(input, 'нещо');
+
+    await userEvent.click(await screen.findByTestId('add-specific-item'));
+    await userEvent.clear(screen.getByLabelText('Име на артикула'));
+
+    expect(screen.getByTestId('manual-store-product-submit')).toBeDisabled();
+    expect(onItemAdded).not.toHaveBeenCalled();
+  });
+
+  test('offline: manual store product still adds immediately and calls onItemAdded', async () => {
+    mockedApiRequest
+      .mockResolvedValueOnce({ user_products: [] })
+      .mockRejectedValueOnce(new Error('Network error'));
+
+    const onItemAdded = vi.fn();
+    render(<AddSearchScreen selectedList={mockList} onItemAdded={onItemAdded} />);
+
+    const input = await screen.findByLabelText('Търси термин');
+    await userEvent.type(input, 'офлайн артикул');
+
+    await userEvent.click(await screen.findByTestId('add-specific-item'));
+    await userEvent.click(screen.getByTestId('manual-store-product-submit'));
+
+    await waitFor(() => expect(onItemAdded).toHaveBeenCalled());
+  });
+
   test('offline: apiRequest failure still optimistically adds and calls onItemAdded', async () => {
     await putUserProduct({
       client_uuid: 'up-offline',

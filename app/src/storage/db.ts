@@ -21,13 +21,25 @@ export type UserProductRecord = {
   created_at: string;
 };
 
+export type StoreProductRecord = {
+  client_uuid: string;
+  id?: string;
+  source: 'crawler' | 'user';
+  created_by_user_id?: number;
+  name: string;
+  image_url?: string | null;
+  created_at: string;
+};
+
 export type ListItemRecord = {
   client_uuid: string;
   id?: string;
   list_client_uuid: string;
   list_id?: string;
-  user_product_client_uuid: string;
+  user_product_client_uuid?: string;
   user_product_id?: string;
+  store_product_client_uuid?: string;
+  store_product_id?: string;
   quantity: number;
   unit: string;
   is_checked: boolean;
@@ -51,7 +63,7 @@ export type ListItemView = ListItemRecord & {
 };
 
 const DB_NAME = 'si-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 const normalizeTerm = (term: string) => term.trim().toLocaleLowerCase('bg-BG');
 
@@ -66,6 +78,9 @@ const getDb = () =>
       }
       if (!db.objectStoreNames.contains('user_products')) {
         db.createObjectStore('user_products', { keyPath: 'client_uuid' });
+      }
+      if (!db.objectStoreNames.contains('store_products')) {
+        db.createObjectStore('store_products', { keyPath: 'client_uuid' });
       }
       if (!db.objectStoreNames.contains('mutation_queue')) {
         db.createObjectStore('mutation_queue', { keyPath: 'client_uuid' });
@@ -118,6 +133,7 @@ export const getListItems = async (listKey: string): Promise<ListItemView[]> => 
   const db = await getDb();
   const items = await db.getAll('list_items');
   const userProducts = await db.getAll('user_products');
+  const storeProducts = await db.getAll('store_products');
 
   return items
     .filter((item) => item.list_client_uuid === listKey || item.list_id === listKey)
@@ -126,9 +142,13 @@ export const getListItems = async (listKey: string): Promise<ListItemView[]> => 
         userProducts.find((product) => product.client_uuid === item.user_product_client_uuid) ??
         userProducts.find((product) => product.id === item.user_product_id);
 
+      const storeProduct =
+        storeProducts.find((product) => product.client_uuid === item.store_product_client_uuid) ??
+        storeProducts.find((product) => product.id === item.store_product_id);
+
       return {
         ...item,
-        term: userProduct?.term ?? 'Unknown item'
+        term: userProduct?.term ?? storeProduct?.name ?? 'Unknown item'
       };
     })
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
@@ -179,6 +199,16 @@ export const putUserProduct = async (userProduct: UserProductRecord) => {
 export const getUserProduct = async (clientUuid: string) => {
   const db = await getDb();
   return db.get('user_products', clientUuid);
+};
+
+export const putStoreProduct = async (storeProduct: StoreProductRecord) => {
+  const db = await getDb();
+  await db.put('store_products', storeProduct);
+};
+
+export const getStoreProductByClientUuid = async (clientUuid: string) => {
+  const db = await getDb();
+  return db.get('store_products', clientUuid);
 };
 
 export const enqueueMutation = async (mutation: MutationQueueRecord) => {
@@ -318,12 +348,14 @@ export const mergeServerListItem = async (
     client_uuid: string;
     id: string;
     list_id: string;
-    user_product_id: string;
+    user_product_id: string | null;
+    store_product_id?: string | null;
     quantity: number;
     unit: string;
     is_checked: boolean;
     updated_at: string;
     term: string | null;
+    name?: string | null;
   },
   listClientUuid: string
 ) => {
@@ -338,7 +370,7 @@ export const mergeServerListItem = async (
     return;
   }
 
-  if (serverItem.term) {
+  if (serverItem.term && serverItem.user_product_id) {
     const existingProduct = await db.get('user_products', serverItem.user_product_id);
     if (!existingProduct) {
       await db.put('user_products', {
@@ -353,13 +385,28 @@ export const mergeServerListItem = async (
     }
   }
 
+  if (serverItem.name && serverItem.store_product_id) {
+    const existingProduct = await db.get('store_products', serverItem.store_product_id);
+    if (!existingProduct) {
+      await db.put('store_products', {
+        client_uuid: serverItem.store_product_id,
+        id: serverItem.store_product_id,
+        source: 'user',
+        name: serverItem.name,
+        created_at: serverItem.updated_at
+      });
+    }
+  }
+
   await db.put('list_items', {
     client_uuid: serverItem.client_uuid,
     id: serverItem.id,
     list_client_uuid: listClientUuid,
     list_id: serverItem.list_id,
-    user_product_client_uuid: serverItem.user_product_id,
-    user_product_id: serverItem.user_product_id,
+    user_product_client_uuid: serverItem.user_product_id ?? undefined,
+    user_product_id: serverItem.user_product_id ?? undefined,
+    store_product_client_uuid: serverItem.store_product_id ?? undefined,
+    store_product_id: serverItem.store_product_id ?? undefined,
     quantity: serverItem.quantity,
     unit: serverItem.unit,
     is_checked: serverItem.is_checked,

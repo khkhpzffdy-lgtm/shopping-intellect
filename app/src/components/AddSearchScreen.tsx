@@ -7,9 +7,11 @@ import {
   getUserProductByTerm,
   markMutationInFlight,
   putListItem,
+  putStoreProduct,
   putUserProduct,
   touchListUpdatedAt,
   type ShoppingListRecord,
+  type StoreProductRecord,
   type UserProductRecord
 } from '../storage/db';
 import { sendMutation } from '../sync/sendMutation';
@@ -35,6 +37,10 @@ export const AddSearchScreen = ({ selectedList, onItemAdded, isActive = true }: 
   const [allTerms, setAllTerms] = useState<UserProductRecord[]>([]);
   const [adding, setAdding] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [manualName, setManualName] = useState('');
+  const [manualPhotoUrl, setManualPhotoUrl] = useState('');
+  const [manualBarcode, setManualBarcode] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -161,6 +167,92 @@ export const AddSearchScreen = ({ selectedList, onItemAdded, isActive = true }: 
     await addItemToList(product);
   };
 
+  const addItemViaStoreProduct = async (storeProduct: StoreProductRecord) => {
+    if (!user || !selectedList) return;
+    setAdding(true);
+    setErrorMessage(null);
+    try {
+      const now = new Date().toISOString();
+      const itemClientUuid = generateUuid();
+      const optimisticItem = {
+        client_uuid: itemClientUuid,
+        list_client_uuid: selectedList.client_uuid,
+        list_id: selectedList.id,
+        store_product_client_uuid: storeProduct.client_uuid,
+        store_product_id: storeProduct.id,
+        quantity: 1,
+        unit: 'piece',
+        is_checked: false,
+        created_at: now,
+        updated_at: now
+      };
+
+      await putListItem(optimisticItem);
+      await touchListUpdatedAt(selectedList.client_uuid, now);
+
+      const mutationBody = {
+        client_uuid: itemClientUuid,
+        quantity: 1,
+        unit: 'piece',
+        is_checked: false,
+        store_product: {
+          client_uuid: storeProduct.client_uuid,
+          name: storeProduct.name,
+          image_url: storeProduct.image_url ?? null
+        }
+      };
+
+      await enqueueMutation({
+        client_uuid: itemClientUuid,
+        endpoint: selectedList.id
+          ? `/lists/${selectedList.id}/items`
+          : `/lists/${selectedList.client_uuid}/items`,
+        method: 'POST',
+        body: mutationBody,
+        created_at: now,
+        attempts: 0,
+        status: 'pending',
+        entity_client_uuid: itemClientUuid
+      });
+
+      onItemAdded();
+
+      try {
+        const claimedMutation = await markMutationInFlight(itemClientUuid);
+        if (claimedMutation) {
+          await sendMutation(claimedMutation);
+        }
+      } catch {
+        // queued — will sync on next drain
+      }
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const addManualStoreProduct = async () => {
+    if (!user) return;
+    const name = manualName.trim();
+    if (!name) return;
+
+    const now = new Date().toISOString();
+    const storeProduct: StoreProductRecord = {
+      client_uuid: generateUuid(),
+      source: 'user',
+      created_by_user_id: user.id,
+      name,
+      image_url: manualPhotoUrl.trim() || null,
+      created_at: now
+    };
+
+    await putStoreProduct(storeProduct);
+    setShowManualForm(false);
+    setManualName('');
+    setManualPhotoUrl('');
+    setManualBarcode('');
+    await addItemViaStoreProduct(storeProduct);
+  };
+
   const noMatch = query.trim() !== '' && results.length === 0;
 
   if (!selectedList) {
@@ -230,6 +322,61 @@ export const AddSearchScreen = ({ selectedList, onItemAdded, isActive = true }: 
               <span aria-hidden="true">＋</span>
               {' '}Добави „{query.trim()}" като нов термин
             </button>
+          ) : null}
+
+          {noMatch && !showManualForm ? (
+            <button
+              type="button"
+              className="addsearch__addnew"
+              onClick={() => {
+                setManualName(query.trim());
+                setShowManualForm(true);
+              }}
+              disabled={adding}
+              data-testid="add-specific-item"
+            >
+              <span aria-hidden="true">＋</span>
+              {' '}Добави конкретен артикул
+            </button>
+          ) : null}
+
+          {showManualForm ? (
+            <form
+              className="addsearch__manualform"
+              data-testid="manual-store-product-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void addManualStoreProduct();
+              }}
+            >
+              <input
+                aria-label="Име на артикула"
+                value={manualName}
+                onChange={(e) => setManualName(e.target.value)}
+                placeholder="Напр. Мляко Данон 2% 1л"
+                className="addbar__field"
+              />
+              <input
+                aria-label="Снимка (URL)"
+                value={manualPhotoUrl}
+                onChange={(e) => setManualPhotoUrl(e.target.value)}
+                placeholder="Снимка (по избор)"
+                className="addbar__field"
+              />
+              <input
+                aria-label="Баркод"
+                value={manualBarcode}
+                onChange={(e) => setManualBarcode(e.target.value)}
+                placeholder="Баркод (по избор)"
+                className="addbar__field"
+              />
+              <button type="submit" disabled={adding || !manualName.trim()} data-testid="manual-store-product-submit">
+                Добави
+              </button>
+              <button type="button" onClick={() => setShowManualForm(false)} disabled={adding}>
+                Отказ
+              </button>
+            </form>
           ) : null}
         </div>
       ) : (

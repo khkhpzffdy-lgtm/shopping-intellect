@@ -157,11 +157,7 @@ export const ListsScreen = ({
               className="listcard__open"
             >
               <div className="listcard__main">
-                <div
-                  className="listcard__titlerow"
-                  onClick={(event) => event.stopPropagation()}
-                  onKeyDown={(event) => event.stopPropagation()}
-                >
+                <div className="listcard__titlerow">
                   <RenameableTitle
                     name={list.name}
                     onRename={(name) => onRenameList(list.client_uuid, name)}

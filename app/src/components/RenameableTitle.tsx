@@ -29,9 +29,11 @@ export const RenameableTitle = ({ name, onRename, titleClassName, renameLabel }:
         className={titleClassName}
         value={draft}
         autoFocus
+        onClick={(event) => event.stopPropagation()}
         onChange={(event) => setDraft(event.target.value)}
         onBlur={commit}
         onKeyDown={(event) => {
+          event.stopPropagation();
           if (event.key === 'Enter') {
             commit();
           } else if (event.key === 'Escape') {
@@ -50,7 +52,8 @@ export const RenameableTitle = ({ name, onRename, titleClassName, renameLabel }:
         type="button"
         className="iconbtn"
         aria-label={renameLabel}
-        onClick={() => {
+        onClick={(event) => {
+          event.stopPropagation();
           setDraft(name);
           setEditing(true);
         }}

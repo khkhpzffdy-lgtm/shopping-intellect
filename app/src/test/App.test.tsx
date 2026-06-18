@@ -995,3 +995,30 @@ test('renaming a list from the Lists overview (without opening it) saves and doe
   // Still on the overview, not navigated into the list (item count is still visible).
   expect(screen.getByText('0 items')).toBeInTheDocument();
 });
+
+test('tapping a list name on the Lists overview still opens the list', async () => {
+  useAuthStore.getState().setSession({
+    accessToken: makeToken({ user_id: 21, family_ids: [], display_name: 'Iliyana' }),
+    expiresIn: 900,
+    user: { id: 21, displayName: 'Iliyana', familyIds: [] }
+  });
+
+  await putList({
+    client_uuid: 'open-list-uuid-1',
+    id: '964',
+    name: 'Open me',
+    owner_type: 'user',
+    owner_id: 21,
+    updated_at: '2026-06-18T00:00:00.000Z'
+  });
+
+  mockFetch.mockImplementation(() =>
+    Promise.resolve(new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+  );
+
+  renderApp();
+
+  await userEvent.click(await screen.findByText('Open me'));
+
+  expect(await screen.findByRole('button', { name: 'Back' })).toBeInTheDocument();
+});

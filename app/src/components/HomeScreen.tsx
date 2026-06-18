@@ -396,21 +396,22 @@ export const HomeScreen = () => {
     }
   };
 
-  const handleRenameList = async (name: string) => {
-    if (!selectedList) {
+  const handleRenameList = async (listKey: string, name: string) => {
+    const list = lists.find((candidate) => candidate.client_uuid === listKey);
+    if (!list) {
       return;
     }
 
     const updatedList = {
-      ...selectedList,
+      ...list,
       name,
       updated_at: new Date().toISOString()
     };
 
     await putList(updatedList);
 
-    if (!selectedList.id) {
-      await updateMutationBody(selectedList.client_uuid, { name });
+    if (!list.id) {
+      await updateMutationBody(list.client_uuid, { name });
       await refreshLists();
       return;
     }
@@ -418,13 +419,13 @@ export const HomeScreen = () => {
     const mutationUuid = generateUuid();
     await enqueueMutation({
       client_uuid: mutationUuid,
-      endpoint: `/lists/${selectedList.id}`,
+      endpoint: `/lists/${list.id}`,
       method: 'PATCH',
       body: { name },
       created_at: updatedList.updated_at,
       attempts: 0,
       status: 'pending',
-      entity_client_uuid: selectedList.client_uuid
+      entity_client_uuid: list.client_uuid
     });
     await refreshLists();
 
@@ -492,7 +493,7 @@ export const HomeScreen = () => {
             onOpenAddSearch={() => setAddSearchOpen(true)}
             onToggleChecked={handleToggleChecked}
             onRemoveItem={handleRemoveItem}
-            onRenameList={handleRenameList}
+            onRenameList={(name) => handleRenameList(selectedList.client_uuid, name)}
           />
         ) : (
           <ListsScreen
@@ -504,6 +505,7 @@ export const HomeScreen = () => {
             onCreateNameChange={setCreateName}
             onCreateList={handleCreateList}
             onOpenList={setSelectedListKey}
+            onRenameList={handleRenameList}
             onDeleteList={handleDeleteList}
             theme={theme}
             onSetTheme={setTheme}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ShoppingListRecord } from '../storage/db';
 import { EmptyState } from './EmptyState';
+import { RenameableTitle } from './RenameableTitle';
 import { SyncStatusIndicator } from './SyncStatusIndicator';
 import { TrashIcon } from './icons';
 
@@ -13,6 +14,7 @@ type ListsScreenProps = {
   onCreateNameChange: (value: string) => void;
   onCreateList: () => void;
   onOpenList: (listKey: string) => void;
+  onRenameList: (listKey: string, name: string) => void;
   onDeleteList: (listKey: string) => void;
   theme: 'light' | 'dark';
   onSetTheme: (theme: 'light' | 'dark') => void;
@@ -28,6 +30,7 @@ export const ListsScreen = ({
   onCreateNameChange,
   onCreateList,
   onOpenList,
+  onRenameList,
   onDeleteList,
   theme,
   onSetTheme,
@@ -142,16 +145,37 @@ export const ListsScreen = ({
       <div className="grid gap-3" style={{ gridTemplateColumns: '1fr' }}>
         {lists.map((list) => (
           <div key={list.client_uuid} className="listcard">
-            <button type="button" onClick={() => onOpenList(list.client_uuid)} className="listcard__open">
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => onOpenList(list.client_uuid)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  onOpenList(list.client_uuid);
+                }
+              }}
+              className="listcard__open"
+            >
               <div className="listcard__main">
-                <h2 className="listcard__name">{list.name}</h2>
+                <div
+                  className="listcard__titlerow"
+                  onClick={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => event.stopPropagation()}
+                >
+                  <RenameableTitle
+                    name={list.name}
+                    onRename={(name) => onRenameList(list.client_uuid, name)}
+                    titleClassName="listcard__name"
+                    renameLabel={`Преименувай ${list.name}`}
+                  />
+                </div>
                 <p className="listcard__meta">{itemCounts[list.client_uuid] ?? 0} items</p>
               </div>
               <SyncStatusIndicator
                 pending={mutationStatusCounts[list.client_uuid]?.pending ?? 0}
                 failed={mutationStatusCounts[list.client_uuid]?.failed ?? 0}
               />
-            </button>
+            </div>
             <button
               type="button"
               className="iconbtn listcard__delete"

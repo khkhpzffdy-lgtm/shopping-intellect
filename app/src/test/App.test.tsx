@@ -948,3 +948,50 @@ test('saving a blank list name does not wipe out the existing name', async () =>
     })
   ).toBe(false);
 });
+
+test('renaming a list from the Lists overview (without opening it) saves and does not navigate into the list', async () => {
+  useAuthStore.getState().setSession({
+    accessToken: makeToken({ user_id: 20, family_ids: [], display_name: 'Petar' }),
+    expiresIn: 900,
+    user: { id: 20, displayName: 'Petar', familyIds: [] }
+  });
+
+  await putList({
+    client_uuid: 'rename-list-uuid-4',
+    id: '963',
+    name: 'Overview original',
+    owner_type: 'user',
+    owner_id: 20,
+    updated_at: '2026-06-18T00:00:00.000Z'
+  });
+
+  mockFetch.mockImplementation((input) => {
+    const url = typeof input === 'string' ? input : (input as Request).url;
+    if (url.endsWith('/lists/963')) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ list: { id: '963', name: 'Overview renamed', client_uuid: 'rename-list-uuid-4', owner_type: 'user', owner_id: '20', item_count: 0, updated_at: '2026-06-18T00:01:00.000Z' } }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+    }
+    return Promise.resolve(new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+  });
+
+  renderApp();
+
+  await screen.findByText('Overview original');
+  await userEvent.click(await screen.findByRole('button', { name: 'Преименувай Overview original' }));
+
+  const input = screen.getByLabelText('List name');
+  await userEvent.clear(input);
+  await userEvent.type(input, 'Overview renamed{Enter}');
+
+  expect(await screen.findByText('Overview renamed')).toBeInTheDocument();
+  await waitFor(() => {
+    expect(mockFetch.mock.calls.some(([input]) => (typeof input === 'string' ? input : (input as Request).url).endsWith('/lists/963'))).toBe(true);
+  });
+
+  // Still on the overview, not navigated into the list (item count is still visible).
+  expect(screen.getByText('0 items')).toBeInTheDocument();
+});

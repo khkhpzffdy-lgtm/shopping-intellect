@@ -1,7 +1,6 @@
-import { useState } from 'react';
 import type { ListItemView, ShoppingListRecord } from '../storage/db';
 import { useListModeStore } from '../store/listMode';
-import { EditIcon } from './icons';
+import { RenameableTitle } from './RenameableTitle';
 import { SyncStatusIndicator } from './SyncStatusIndicator';
 
 type ListScreenProps = {
@@ -41,18 +40,6 @@ export const ListScreen = ({
 }: ListScreenProps) => {
   const mode = useListModeStore((state) => state.modes[list.client_uuid] ?? 'planning');
   const setMode = useListModeStore((state) => state.setMode);
-  const [editingName, setEditingName] = useState(false);
-  const [nameDraft, setNameDraft] = useState(list.name);
-
-  const commitRename = () => {
-    const trimmed = nameDraft.trim();
-    setEditingName(false);
-    if (trimmed === '' || trimmed === list.name) {
-      setNameDraft(list.name);
-      return;
-    }
-    onRenameList(trimmed);
-  };
 
   return (
     <section className="space-y-4">
@@ -60,39 +47,12 @@ export const ListScreen = ({
         <button type="button" onClick={onBack} className="iconbtn" aria-label="Back">
           ←
         </button>
-        {editingName ? (
-          <input
-            aria-label="List name"
-            className="appbar__title"
-            value={nameDraft}
-            autoFocus
-            onChange={(event) => setNameDraft(event.target.value)}
-            onBlur={commitRename}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                commitRename();
-              } else if (event.key === 'Escape') {
-                setNameDraft(list.name);
-                setEditingName(false);
-              }
-            }}
-          />
-        ) : (
-          <>
-            <div className="appbar__title">{list.name}</div>
-            <button
-              type="button"
-              className="iconbtn"
-              aria-label="Rename list"
-              onClick={() => {
-                setNameDraft(list.name);
-                setEditingName(true);
-              }}
-            >
-              <EditIcon />
-            </button>
-          </>
-        )}
+        <RenameableTitle
+          name={list.name}
+          onRename={onRenameList}
+          titleClassName="appbar__title"
+          renameLabel="Rename list"
+        />
         <button type="button" onClick={onOpenAddSearch} className="iconbtn" aria-label="Search">
           🔍
         </button>

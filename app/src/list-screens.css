@@ -6,6 +6,10 @@
   flex-wrap: wrap;
 }
 .si-root .appbar__title { font-size: var(--fs-title); font-weight: 700; letter-spacing: -0.3px; flex: 1; }
+.si-root input.appbar__title {
+  border: none; background: transparent; outline: none;
+  color: var(--ink); font-family: inherit; padding: 0; min-width: 0;
+}
 .si-root .appbar__title b { color: var(--accent); font-weight: 700; }
 .si-root .iconbtn {
   display: flex; align-items: center; justify-content: center;

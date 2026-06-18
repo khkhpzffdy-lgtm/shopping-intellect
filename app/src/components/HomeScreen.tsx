@@ -539,7 +539,10 @@ export const HomeScreen = () => {
             </div>
             <AddSearchScreen
               selectedList={selectedList}
-              onItemAdded={() => setAddSearchOpen(false)}
+              onItemAdded={() => {
+                setAddSearchOpen(false);
+                void refreshItems(selectedList.client_uuid);
+              }}
               isActive={addSearchOpen}
             />
           </div>

@@ -143,7 +143,7 @@ export const ListsScreen = ({
         {lists.map((list) => (
           <div key={list.client_uuid} className="listcard">
             <button type="button" onClick={() => onOpenList(list.client_uuid)} className="listcard__open">
-              <div>
+              <div className="listcard__main">
                 <h2 className="listcard__name">{list.name}</h2>
                 <p className="listcard__meta">{itemCounts[list.client_uuid] ?? 0} items</p>
               </div>
@@ -154,7 +154,7 @@ export const ListsScreen = ({
             </button>
             <button
               type="button"
-              className="iconbtn"
+              className="iconbtn listcard__delete"
               aria-label={`Изтрий ${list.name}`}
               onClick={() => {
                 if (window.confirm(`Изтрий списъка "${list.name}"? Това действие е необратимо.`)) {

@@ -143,16 +143,17 @@
 
 /* ---- Lists overview ---- */
 .si-root .listcard {
-  display: flex; align-items: center; gap: 4px;
+  display: flex; align-items: flex-start; gap: 4px;
   width: 100%; min-width: 0; padding: 4px;
   background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
 }
+.si-root .listcard__delete { margin-top: 4px; }
 .si-root .listcard__open {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
   flex: 1; min-width: 0; text-align: left; padding: 12px;
   background: none; border: none; cursor: pointer;
 }
-.si-root .listcard__open > div { min-width: 0; flex: 1; }
+.si-root .listcard__main { min-width: 0; flex: 1; }
 .si-root .listcard__name {
   font-size: var(--fs-h1); font-weight: 600; color: var(--ink);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;

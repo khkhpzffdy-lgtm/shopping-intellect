@@ -14,6 +14,7 @@
   color: var(--ink); flex-shrink: 0; font-size: var(--fs-h2);
 }
 .si-root .iconbtn:active { background: var(--input); }
+.si-root .iconbtn svg { width: 20px; height: 20px; flex-shrink: 0; }
 
 .si-root .modeseg { display: inline-flex; padding: 3px; gap: 2px; background: var(--input); border-radius: 999px; }
 .si-root .modeseg__opt {

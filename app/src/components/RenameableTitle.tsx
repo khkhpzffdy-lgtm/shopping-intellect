@@ -29,6 +29,10 @@ export const RenameableTitle = ({ name, onRename, titleClassName, renameLabel }:
         className={titleClassName}
         value={draft}
         autoFocus
+        autoComplete="off"
+        autoCapitalize="off"
+        autoCorrect="off"
+        enterKeyHint="done"
         onClick={(event) => event.stopPropagation()}
         onChange={(event) => setDraft(event.target.value)}
         onBlur={commit}

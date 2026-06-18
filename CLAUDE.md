@@ -48,6 +48,13 @@ dialog). Two people, side project, **€0 additional infra in Stage 1** (D §5).
 1. **IDs:** server `BIGINT UNSIGNED` auto-increment. Offline-born entities — **both
    `list_items` and `user_products`** — additionally carry a `client_uuid` (UUIDv4) for
    idempotent sync. (01 §8, D §9.)
+1. **A `list_items` row targets exactly one of `user_product_id` (broad term) or
+   `store_product_id` (specific item) — never both, never free text** (amended
+   2026-06-18 — D §14 "list_items can target a specific StoreProduct directly").
+   `StoreProduct` carries a `source` (`crawler`|`user`) so a person can record a
+   specific item (name required, photo/barcode optional) before any crawl finds it.
+   This is still not a global product-catalog picker — a user-sourced `StoreProduct`
+   is created by that same user, never browsed from someone else's catalog.
 1. **Naming is fixed:** PHP namespace `ShoppingIntellect\` · REST namespace `si/v1`
    (mounted at `/wp-json/si/v1/`) · tables **`oCk_si_*`** — the table prefix is
    **`$wpdb->prefix` + `si_`**, resolving to `oCk_si_` on the current install
@@ -75,8 +82,13 @@ the user's term              neutral concept, lazily        broad crawl; post-MV
 born at list-write time      built from demand              enriched from receipts
 ```
 
-- `list_items` reference **`user_product_id`** — never a free-text string and never a
-  canonical product directly. (D §9.)
+- `list_items` reference **either `user_product_id` (broad term) or `store_product_id`
+  (a specific item, e.g. "Мляко Данон 2% 1л")** — exactly one of the two, never a
+  free-text string. (D §9, D §14 2026-06-18.) A `StoreProduct` can be `source='user'`
+  (manually recorded, not yet crawled) or `source='crawler'` — both are addressable
+  directly from a list; this is still not a fourth layer or a regression to a single
+  canonical Product, since a user-sourced StoreProduct is created by that user, not
+  browsed from a shared catalog.
 - **Broad by default.** A UserProduct attaches to a *bucket*, not a brand. The user may
   **opt in** to a brand anchor if brand matters. Brand representation is still open (D §14).
 - **Matching is by selection.** The user opens a UserProduct, sees every candidate offer

@@ -137,7 +137,8 @@ The designer must surface these as **separate** actions; “remove from list” 
 |----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 |**Shopping List (planning)**|Term · quantity/unit · favorite mark · brand chip if anchored · expandable to candidates. No inline price.                                                                                     |
 |**Shopping List (shopping)**|Large checklist row: term · quantity · check target · `added_by` attribution on family lists. No price, no expansion. (§4.4, §5)                                                               |
-|**Add / Search**            |Matches the **owner’s own terms**; offers favorites / recent / frequent quick-add and category/promotion browse. **No global product-catalog picker.** A new term → a new UserProduct. (§2, §6)|
+|**Add / Search**            |Matches the **owner’s own terms**; offers favorites / recent / frequent quick-add. **No global product-catalog picker.** A new term → a new UserProduct. Reached via a `+` affordance **on the List screen** — not a bottom-nav tab (resolved `decisions.md` 2026-06-17). (§2, §6)|
+|**Catalog** *(new)*         |Browse-only list of category buckets (`GET /categories`). **No prices, no offers, no connection to adding a list item** — a pure taxonomy browse, separate from Add/Search and from the future Offers tab. Lives in the bottom nav (resolved `decisions.md` 2026-06-17).                                                                                                                                                                  |
 |**Product Detail**          |Term · favorite toggle · quantity/unit edit · **candidates across all stores** with promo markers · the anchor action (§3). Where prices live. “Matching in progress” if no bucket.            |
 |**Comparison**              |A row contributing to each store’s total (broad → representative; anchored → the brand offer or *not available*), expandable to all candidates (§5).                                           |
 
@@ -1100,6 +1101,15 @@ Paste-ready **new** screen-level UX decisions made in this document (mirrors the
 > `decisions.md §14`). One **minor** item stays open in `decisions.md §14` and is **not** owned
 > by this document: an explicit multi-member `DELETE /families/{id}` dissolve (a `06` contract
 > call, not a screen).
+
+- [x] **Bottom navigation holds browse destinations only, not actions (2026-06-17).** `Lists` and
+  `Catalog` (new) in the bottom nav; **`Add` is removed from the bottom nav** — adding to a list
+  is a `+` affordance **on the List screen**, opening Add/Search as an overlay/sub-screen. The new
+  **Catalog** screen is a browse-only list of category buckets (`GET /categories`, 06 §6.5) with
+  **no prices, no offers, and no connection to list-adding** — distinct from Add/Search (still the
+  only path that creates a UserProduct, still owner's-terms-only — §2.6 unchanged) and from the
+  future `Offers` tab (`GET /promotions`, 06 §6.5, not yet built). Does not reopen "no global
+  product-catalog picker." (§2.6, §6, Component Inventory §8)
 
 -----
 

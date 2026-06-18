@@ -231,6 +231,117 @@ their own terms, offline, and have it sync.*
 - **Build order note (2026-06-15):** moved later in the *build sequence* — see "Re-sequencing"
   below. Dependency stays §2.4; only the order it's tackled in changed.
 
+### §2.6 — Delete a list (hard delete, items/terms survive)
+- **Goal:** a list can be deleted from `ListsScreen` — `DELETE /lists/{id}` removes the
+  `lists` row and its `list_items` rows only; the `user_products`/`store_products` those
+  items referenced are untouched (reusable in other lists, history preserved).
+- **Dep:** §2.3d (deletion must reconcile correctly against the boot pull-sync, not just
+  the local optimistic cache)
+- **Canon:** `04 §4.3` (list_items `ON DELETE CASCADE` from `lists`, `user_products`/
+  `store_products` referenced `ON DELETE RESTRICT` so a list never cascades into deleting
+  shared history) · `decisions.md` "Resolved — list_items can target a specific
+  StoreProduct directly" (2026-06-18, hard-delete-list paragraph).
+- **Iron:** offline-first — a delete issued offline queues like any other mutation and
+  replays idempotently via `client_uuid`/mutation id (§2.3/§2.3b unchanged).
+- **Owner sees:** deletes a list from the overview; it disappears immediately (optimistic),
+  survives a reload, and the terms/items that were in it are still available to add to a
+  different list.
+
+### §2.7 — Rename a list
+- **Codegen note (verified 2026-06-18):** `resolveEndpoint` in `sendMutation.ts`
+  branches as `if (method === 'POST') {...} if (method === 'DELETE') {...} return
+  mutation.endpoint` — there is no `!== 'POST'` catch-all branch shared by DELETE and
+  others. A PATCH mutation today falls through to the final unresolved `return`, i.e.
+  it is NOT covered by the existing DELETE branch. Add a third `if (mutation.method
+  === 'PATCH')` block mirroring the DELETE one (same `/^\/lists\/([^/]+)$/` match,
+  same `getList`/`list.id` resolution) rather than trying to "extend" DELETE's branch.
+- **Goal:** a list's `name` can be edited in place from the List screen app bar; `PATCH
+  /lists/{id}` (new endpoint — none exists today per `ListController`) persists it.
+- **Dep:** §2.3b (must route through the unified `sendMutation` pipeline, not a sixth
+  hand-rolled copy)
+- **Canon:** `04 §4.3` (`lists.name`, `updated_at` last-write-wins) · `07 §5.5` (unified
+  mutation pipeline) — no UX doc section exists for inline rename yet; follow the existing
+  inline-edit affordance conventions used elsewhere in `design/screens2.jsx` or flag if
+  none fits.
+- **Iron:** `client_uuid`/idempotent replay unchanged; last-write-wins on `updated_at`, no
+  merge UI (D §9).
+- **Owner sees:** taps the list name, edits it, it saves and persists after reload; offline
+  edits queue and apply on reconnect like any other mutation.
+
+### §4.0c — Manual StoreProduct creation (the "specific item" path)
+- **Goal:** Add/Search (`AddSearchScreen`, §4.0) gains a second create path alongside
+  "добави нов термин" (which creates a `UserProduct`): "добави конкретен артикул," which
+  creates a `StoreProduct` with `source='user'`, `store_id NULL`, name required,
+  photo/barcode optional, and adds a `list_items` row with `store_product_id` set
+  (`user_product_id` NULL) instead. Both paths are equally reachable, equally first-class
+  — neither is a fallback for the other (owner's explicit instruction, 2026-06-18: "и
+  двете могат да влизат в списъка").
+- **Dep:** §4.0b (the screen this extends), the `list_items.store_product_id` column from
+  this session's schema amendment (`04 §4.3`)
+- **Canon:** `decisions.md` "Resolved — list_items can target a specific StoreProduct
+  directly" (2026-06-18, full rationale) · `04 §4.3`/`§4.4` (new `store_product_id` FK on
+  `list_items`; new `source`/`created_by_user_id`/`image_url` columns on `store_products`)
+  · `10 §2.6`/`§6.2` (still not a global catalog picker — a user-sourced StoreProduct is
+  this user's own creation, never browsed from someone else's).
+  **Needs a migration** (new nullable columns + FK) before this Slice can land — confirm
+  `MigrationRegistry::defaultMigrations()` gets a new entry and `STATUS.md`'s
+  deactivate/activate-to-migrate step is followed after deploy.
+- **Iron:** the amended list_items exactly-one-of invariant (`CLAUDE.md §2`, this
+  session); offline-first — a manually-created StoreProduct is itself offline-born and
+  needs the same `client_uuid` idempotent-replay treatment as a UserProduct (§2.1/§2.6).
+- **Owner sees:** in Add/Search, searching a term that doesn't match an existing item
+  offers both "добави като общ продукт" and "добави конкретен артикул"; choosing the
+  latter opens a small form (name + optional photo/barcode) and the resulting row in the
+  list is the specific item, not a generic term.
+
+### §2.8 — Item detail screens (UserProduct and StoreProduct)
+- **Goal:** replace the `ListScreen` placeholder ("Expand details soon") with two real
+  detail views, opened from a list row, matching which type the row references
+  (`user_product_id` vs `store_product_id` — D §14 2026-06-18):
+  - **UserProduct detail:** term (editable — renames the term, re-running the existing
+    create-on-write normalizer/dedupe from §2.1, not creating a duplicate), category
+    bucket (read-only, via the `GET /categories` lookup already built for §4.0b),
+    favorite toggle (`is_favorite`, already returned by `UserProductController` but with
+    no UI control today).
+  - **StoreProduct detail:** name (editable), optional photo (`image_url`), optional
+    barcode (writes to `oCk_si_barcodes`), and — only for a `source='user'` row — clear
+    affordance that this is a manually-recorded item, not yet matched to any store.
+  - Both detail screens also expose the existing inline `quantity`/`unit` fields
+    currently only editable from the list row.
+- **Dep:** §2.2d (the placeholder it replaces), §4.0c (StoreProduct creation must exist
+  before a StoreProduct detail screen has anything to show)
+- **Canon:** `04 §4.3`/`§4.4` (`user_products`, `store_products`, `barcodes` columns) ·
+  `decisions.md` "Resolved — list_items can target a specific StoreProduct directly"
+  (2026-06-18) · `02 §6`/`§7` (UserProduct vs StoreProduct meaning) — no `10`/`11` UX
+  section specifies this screen yet; new ground, flag any ambiguity rather than
+  inventing UX precedent.
+- **Iron:** demand-first — renaming a UserProduct must go through the same normalizer as
+  create-on-write, never a raw string overwrite that could orphan the dedupe unique
+  (`(owner, normalized_term)`); StoreProduct edits never imply categorization or
+  store-matching (that's §3.2/§4.x, still deferred).
+- **Owner sees:** opens any list item and sees a real detail screen for its actual type;
+  toggling favorite on a UserProduct surfaces it in quick-add (once §2.5 ships); editing a
+  StoreProduct's name/photo/barcode persists and survives reload.
+
+### §2.9 — Profile screen
+- **Goal:** a new Профил screen reachable from `ListsScreen`'s app bar (replacing the
+  inline theme-toggle + logout buttons currently there), holding: account info (display
+  name, email — read-only in v1), the existing theme toggle (`store/theme.ts`, unchanged
+  logic, relocated), and logout (unchanged logic, relocated). **No family management in
+  v1** (`decisions.md` "Resolved — Profile screen, v1 scope," 2026-06-18) — family
+  endpoints don't exist yet.
+- **Dep:** §2.3c (don't relocate the app bar while the sync-indicator redesign is still
+  touching the same files)
+- **Canon:** `decisions.md` "Resolved — Profile screen, v1 scope" (2026-06-18) ·
+  `store/theme.ts`/`store/auth.ts` (existing logic to relocate, not rewrite) — no `10`/`11`
+  section specifies a Profile screen yet; new ground.
+- **Iron:** access JWT stays in-memory only, refresh token stays in the httpOnly cookie —
+  this Slice only relocates existing logout/session-clear calls, never touches token
+  storage (`CLAUDE.md §2`).
+- **Owner sees:** a new Профил entry point shows display name + email, the theme toggle
+  still switches Светла/Тъмна, logout still works — all from one screen instead of
+  scattered in the Lists app bar.
+
 -----
 
 ## Re-sequencing (2026-06-17, revised) — build order vs. dependency order
@@ -238,11 +349,35 @@ their own terms, offline, and have it sync.*
 The numbering above (§2.4/§2.5 before M3/M4) reflects **dependency order** and stays as the
 canonical reference for *what depends on what*. The actual **build order** diverges from it.
 
-**Revised build order (2026-06-17, updated same day):**
+**Revised build order (2026-06-18, updated):**
 
 ```
-§2.3 (done) → §3.1 (done) → §4.0 (done) → §2.3a → §2.3b → §2.3c → §2.2d → §2.3d → §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 → §2.5 → M5
+§2.3 (done) → §3.1 (done) → §4.0 (done) → §2.3a (done) → §2.3b (done) → §2.3c (done) →
+§2.2d (done) → §2.3d (done) → §4.0b (done) → §2.6 → §2.7 → §4.0c → §2.8 → §2.9 →
+§3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 → §2.5 → M5
 ```
+
+**§2.6/§2.7/§4.0c/§2.8/§2.9 (added 2026-06-18, owner-requested core-UX hardening before
+store-matching)** — the Owner wants list management, item/product detail management, and
+a Profile screen fully solid **before** any store-offer matching work (§3.2 onward) begins.
+Inserted as a block right after §4.0b:
+
+- **§2.6 (delete list) / §2.7 (rename list)** close the two missing list-management gaps
+  found by audit (no delete, no rename anywhere in the UI/API today).
+- **§4.0c (manual StoreProduct creation)** ships *before* §2.8 because §2.8's StoreProduct
+  detail screen needs a StoreProduct to exist first. This is also where the schema gains
+  the `list_items.store_product_id` column and the `store_products.source`/
+  `created_by_user_id`/`image_url` columns (`decisions.md` "Resolved — list_items can
+  target a specific StoreProduct directly," 2026-06-18) — a real iron-rule amendment, not
+  cosmetic, so it's sequenced deliberately rather than folded into §2.8.
+- **§2.8 (item detail screens)** replaces the literal "Expand details soon" placeholder
+  with real UserProduct/StoreProduct detail views.
+- **§2.9 (Profile screen)** consolidates the theme toggle + logout (currently loose in
+  `ListsScreen`'s app bar) into one screen, with account info — no family management yet
+  (`decisions.md` "Resolved — Profile screen, v1 scope," 2026-06-18).
+
+This block sits **before** §3.2 (ingestion) — the Owner's explicit ordering: core list/
+item/profile UX should work end-to-end before store-offer comparison is layered on top.
 
 **§2.3d (added 2026-06-17, immediately after §2.2d)** — found while verifying §2.2d on
 shopping.flux.bg: same-account, different-browser sessions showed different lists. Root
@@ -265,13 +400,26 @@ incident" (2026-06-17).
 frontend, touches the same files §2.2c/§4.0 just touched (best done while that context is fresh),
 and unblocks nothing but is unblocked by nothing either.
 
+**§4.0b (added 2026-06-17, owner-requested nav change)** — the Owner asked for the bottom nav
+to become browse-only destinations ahead of two future tabs (`Offers`, `Recipes`): `Add` comes
+off the bottom nav (Add/Search moves to a List-screen `+` affordance), and a new `Catalog` tab
+browses category buckets via a small new public `GET /categories` endpoint. Sequenced right
+after §2.3d/before §3.2 because it directly revises §4.0's nav shell while that context is
+fresh, and because §3.2 (ingestion) doesn't need it first.
+
 **Why this order:**
 
-- **§4.0 (next)** — navigation shell + Add/Search screen first. Pure frontend, no dependency
+- **§4.0 (done)** — navigation shell + Add/Search screen first. Pure frontend, no dependency
   on offers or ingestion. Gets the Owner a real second screen immediately.
-- **§3.2 → §3.3 (before §4.1)** — IngestionService and cron come right after §4.0, while
-  §4.1/§4.2/§4.3 are being designed. When §4.1 ships, there will already be real offers in
-  the DB from the crawler — the Owner sees real prices from day one, not an empty state.
+- **§4.0b (done)** — revised that nav shell per the Owner's 2026-06-17 request.
+- **§2.6 → §2.7 → §4.0c → §2.8 → §2.9 (next)** — core list/item/profile UX hardening,
+  inserted 2026-06-18 at the Owner's explicit request, **before** any store-matching work.
+  List delete/rename close real UI gaps; §4.0c adds the direct-StoreProduct list path and
+  its schema; §2.8 gives every list item a real detail screen of its actual type; §2.9
+  ships a Profile screen. See the block note above for why each is sequenced where it is.
+- **§3.2 → §3.3 (after the above, before §4.1)** — IngestionService and cron, once core UX
+  is solid. When §4.1 ships, there will already be real offers in the DB from the crawler
+  — the Owner sees real prices from day one, not an empty state.
 - **§4.1 → §4.2 → §4.3** — the full comparison flow, now backed by real data.
 - **§2.4 (Family) then §2.5 (Favorites)** — dependency-safe; nothing in §3.x or §4.x
   depends on them.
@@ -335,6 +483,97 @@ candidates with promos marked, picks one, and sees a trustworthy cheapest-store 
   re-sequencing (see note above M3) to avoid the app staying at "two screens" for the duration of
   M3.
 
+### §4.0b — Catalog tab + move Add/Search off the bottom nav (new, added 2026-06-17)
+- **Goal:** the bottom nav becomes browse-only destinations (`Lists`, `Catalog`); a new
+  read-only **Catalog** screen lists category buckets via a new public `GET /categories`
+  endpoint; the **Add/Search** screen (built in §4.0) is reached via a `+` affordance on the
+  List screen instead of a bottom-nav tab — its own behaviour is unchanged.
+- **Dep:** §4.0 (Add/Search screen, BottomNav, App.tsx tab plumbing already exist)
+- **Canon:** `decisions.md §14` (2026-06-17 nav resolution) · `10` §2.6 (Add/Search row +
+  new Catalog row), end-of-doc fold-back (2026-06-17 entry) · `11` B.5 (Add/Search entry
+  point), B.10 (new Catalog screen) · `06 §6.5` (`GET /categories` shape) · `04` §"categories
+  table" (`oCk_si_categories`: `id`, `slug`, `name`, `is_seeded`, `replaced_by_category_id`,
+  `created_at` — flat, no `parent_id` in MVP).
+- **Iron:** **no global product-catalog picker** still holds — tapping a category in Catalog
+  creates nothing and links to no list-add flow; Add/Search remains the only path that creates
+  a UserProduct, still scoped to the owner's own terms (`CLAUDE.md §3`, `10` §2.6).
+- **Backend build instructions:**
+  1. New `Category` model (`Models/Category.php`), plain readonly class like
+     `Models/ShoppingList.php`: `id: int`, `slug: string`, `name: string` (omit
+     `is_seeded`/`replaced_by_category_id` — internal-only, never hydrated for this read path).
+  2. New `CategoryRepositoryInterface` (`Repositories/Contracts`) with one method,
+     `listAll(): array` (`@return list<Category>`, ordered by `name`). New
+     `WpdbCategoryRepository` (`Repositories/Wpdb`), constructor `(object $wpdb,
+     ConfigInterface $config)` — **exactly** the `WpdbListRepository` shape (see that file).
+     Table name is `$this->config->tablePrefix() . 'categories'` (NOT manual
+     `{$wpdb->prefix}si_...` concatenation — `tablePrefix()` already returns `oCk_si_`).
+     Use `$wpdb->get_results()` against a plain `SELECT id, slug, name FROM \`{$table}\`
+     ORDER BY name ASC` (no params to bind, so `prepare()` isn't needed for this query —
+     confirm against `WpdbListRepository::listByOwner` style if a `%s`/`%d` placeholder
+     pattern is preferred instead for consistency).
+  3. New `CategoryController` (`Api`) registering **one public route**:
+     `GET /categories` → `permission_callback: '__return_true'` (matches `AuthController`'s
+     public-route pattern, e.g. `/auth/register`) — `06 §6.5` is explicit this is public, no
+     JWT. Response shape (verbatim from `06 §6.5`):
+     ```
+     { "categories": [ { "id":"...", "slug":"milk", "name":"Мляко" }, … ] }
+     ```
+     `is_seeded` / `replaced_by_category_id` are **not** on the wire — internal-only columns.
+  4. Wire `WpdbCategoryRepository` + `CategoryController` into `Plugin::services()` the same
+     way `WpdbUserProductRepository`/`UserProductController` are wired (construct inside the
+     existing `try` block). **`RestApiBootstrap`'s constructor currently takes exactly three
+     controllers** (`AuthController`, `ListController`, `UserProductController`, plus
+     `AppOriginProvider` — see `Api/RestApiBootstrap.php`) and calls
+     `add_action('rest_api_init', [$controller, 'register'])` once per controller in
+     `register()`. Add a fourth `CategoryController $categoryController` constructor param
+     and a matching `add_action('rest_api_init', [$this->categoryController, 'register'])`
+     line — do not skip updating `register()`, the constructor alone won't wire the route.
+- **Frontend build instructions:**
+  1. `BottomNav.tsx`: replace the `'add'` tab with a `'catalog'` tab — label "Каталог", pick a
+     distinct icon (not `+`, that affordance moves to the List screen). Update the `Tab` type
+     to `'lists' | 'catalog'`.
+  2. New `CatalogScreen.tsx`: on mount (and only while active, mirroring `AddSearchScreen`'s
+     `isActive` pattern), calls `apiRequest<{ categories: {id, slug, name}[] }>('/categories')`
+     (no `authenticated: true` — it's a public route) and renders a flat list of `name`s. Loading
+     skeleton via existing `SkeletonLoader`. Offline/error → empty withheld state (no crash, no
+     stale-looking guess) — reuse `EmptyState` if convenient, otherwise a simple message; this
+     screen has no existing `10 §8` component spec, so keep it minimal, do not invent
+     interactions beyond "show the list."
+  3. `App.tsx`: replace the `'add'`-tab branch with a `'catalog'`-tab branch rendering
+     `CatalogScreen`. Remove `AddSearchScreen` from the top-level tab switch entirely.
+  4. `HomeScreen.tsx` / `ListScreen.tsx`: add local overlay state in `HomeScreen` (e.g.
+     `const [addSearchOpen, setAddSearchOpen] = useState(false)`). `ListScreen`'s existing 🔍
+     `iconbtn` (already wired to an `onOpenAddSearch` prop) now calls a callback that sets this
+     state instead of changing the app-level tab. When open, render `AddSearchScreen` as a
+     full-screen overlay above the list (simple `position: fixed` / full-viewport `div` is
+     enough — no new Modal component, none exists yet per `10 §8.28` being unbuilt) with its own
+     back/close `iconbtn` in an `appbar`, consistent with existing screens' header style
+     (`list-screens.css` `.appbar`/`.iconbtn`). Closing it (back tap or `onItemAdded`) clears the
+     overlay state — list stays open underneath, no tab change.
+- **Tests:**
+  - Backend: `CategoryControllerTest` — `GET /categories` returns `200` with seeded rows
+    (use the existing seeded-categories migration in test fixtures), no auth header required,
+    response shape matches `06 §6.5` exactly (no `is_seeded`/`replaced_by_category_id` leak).
+  - Frontend: update `bottomNav.test.tsx` — rename `'add'` references to `'catalog'`, assert
+    label "Каталог" instead of "Добавяне". New `catalogScreen.test.tsx` mirroring
+    `addSearch.test.tsx`'s mock-`apiRequest` pattern: renders categories, handles empty/offline.
+    `addSearch.test.tsx` itself needs **no changes** (tests the component in isolation, not its
+    entry point). Add a small test or manual check that `ListScreen`'s 🔍 button opens the
+    overlay and a close action returns to the list.
+- **Acceptance criteria:**
+  [ ] Bottom nav shows exactly two tabs: "Списъци" and "Каталог" — no "Добавяне" tab.
+  [ ] Tapping "Каталог" shows a list of category names (e.g. "Мляко", "Хляб") with no prices,
+      no offers, and nothing tappable that adds anything anywhere.
+  [ ] Opening a list and tapping the 🔍 icon opens the existing Add/Search flow (search own
+      terms, add-as-new-term) as an overlay on top of the list; closing it returns to the same
+      list, not to the Lists overview.
+  [ ] Adding an item via this overlay still works exactly as before (offline-safe, optimistic,
+      syncs).
+- **Out of scope:** grouping/hierarchy in Catalog (flat list only — no `parent_id` in MVP);
+  tapping a category navigating anywhere (open question, `11` B.10 — do not invent); the future
+  `Offers` tab (`GET /promotions`, separate slice); reconciling the "Recipes" tab idea against
+  `11`'s recipes/meal-plan MVP-exclusion (flagged in `decisions.md §14`, not resolved here).
+
 ### §4.1 — Candidate read for a UserProduct (broad by default, promos marked)
 - **Goal:** opening a UserProduct returns every candidate offer across stores for its bucket, promos flagged; empty bucket returns `200` + empty `candidates[]` + `category_id: null` ("matching in progress").
 - **Dep:** §3.2, §2.1, §4.0 (Product Detail is reached from the Add/Search screen built in §4.0)
@@ -394,8 +633,8 @@ parallel with M1–M2** if the Owner wants two Codex tracks running — but M4 n
 and M3 (offers) closed. Within each milestone, build top-to-bottom.
 
 **This diagram is dependency order, not build order** — see "Re-sequencing (2026-06-17)" above
-M3 for the actual order Slices are tackled in (§3.1 done → §4.0 → §3.2 → §3.3 → §4.1 → §4.2 →
-§4.3 → §2.4 → §2.5 → M5).
+M3 for the actual order Slices are tackled in (§3.1 done → §4.0 done → §4.0b → §3.2 → §3.3 →
+§4.1 → §4.2 → §4.3 → §2.4 → §2.5 → M5).
 
 -----
 

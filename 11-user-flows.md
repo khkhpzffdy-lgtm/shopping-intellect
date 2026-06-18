@@ -577,7 +577,13 @@ modal) are listed at the end as non-screen surfaces. Components every authentica
 | 7 | Comparison | 6 |
 | 8 | Family screen | 9 |
 | 9 | Accept-invitation screen | 9 |
+| 10 | Catalog *(new — 2026-06-17)* | — (browse-only, no flow yet) |
 | — | Cross-cutting overlays | all |
+
+> **Bottom-nav change (2026-06-17, `decisions.md §14`):** the bottom nav now holds `Lists` and
+> `Catalog` only; **Add/Search is no longer a bottom-nav tab** — it is reached via a `+`
+> affordance **on the List screen** (#4), opening as an overlay/sub-screen. Screen #5 (Add /
+> Search) is unchanged in purpose/behaviour, only in entry point — see B.5 below.
 
 ### B.1 App shell
 - **Purpose** — instant first paint + the silent-refresh boot host; the frame every screen renders
@@ -623,6 +629,9 @@ modal) are listed at the end as non-screen surfaces. Components every authentica
   archive-term — distinct).
 
 ### B.5 Add / Search
+- **Entry point** — a `+` affordance **on the List screen** (B.4), opening this as an
+  overlay/sub-screen scoped to that list. **Not a bottom-nav tab** (resolved `decisions.md`
+  2026-06-17 — supersedes any earlier bottom-nav placement).
 - **Purpose** — add to the current list: search the **owner's own terms only**, quick-add from
   favorites/recent/frequent, or coin a new term. **No global product-catalog picker**
   (`10 §2.6`, §6.2).
@@ -677,7 +686,21 @@ modal) are listed at the end as non-screen surfaces. Components every authentica
   `revoked`/unknown → not-found — each with a clear next step.
 - **Components** — `AcceptInvitationScreen` (`§8.24`), `Toast` (`§8.27`).
 
-### B.10 Cross-cutting overlays (not screens)
+### B.10 Catalog *(new — 2026-06-17)*
+- **Purpose** — a bottom-nav browse destination: the list of category buckets (`GET
+  /categories`, `06 §6.5`). **Pure taxonomy browse** — no prices, no offers, and **no path into
+  adding a list item**; not the same surface as Add/Search's quick-add, and not the future
+  `Offers` tab (`GET /promotions`, `06 §6.5`, unbuilt). Does not reopen "no global
+  product-catalog picker" (`10 §2.6`) — tapping a category here creates nothing.
+- **States** — loading; populated (flat or grouped bucket list); empty (no categories seeded
+  yet — `EmptyState`); offline (cached list if available, else withheld).
+- **Components** — not yet specified in `10 §8`; no flow currently exercises it (flagged, not
+  invented — this screen's component-level spec is new ground, owner direction 2026-06-17).
+- **Open** — exact bucket presentation (flat list vs grouped), and whether tapping a bucket
+  navigates anywhere (e.g. a future read-only "what's in this category" view) are undecided;
+  do not invent — confirm with the owner before building beyond the flat browse list.
+
+### B.11 Cross-cutting overlays (not screens)
 - **`SyncStatusIndicator`** (`§8.19`) — offline banner / sync-pending cue / sync-failed notice /
   synced "updated X ago"; on every authenticated surface; **no conflict state** (`10 §7.6`).
 - **`Toast`** (`§8.27`) — transient non-blocking notice, chiefly sync-failed-for-this-change;
@@ -717,5 +740,7 @@ derived from them. Traces decided behaviour only: broad-by-default, match-by-sel
 dialog), opt-in brand anchoring, owner-level favorites + purchase log, offline-first lists with
 last-write-wins (no conflict UI), email-only family invites with the deep-link accept screen.
 `10` stays canonical for screen-state & component behaviour; `07` for client mechanics; `06` for
-wire shapes; `02`/`00`/`D` for meaning & scope. Thirteen flows · nine screens (+ three cross-cutting
+wire shapes; `02`/`00`/`D` for meaning & scope. Thirteen flows · ten screens (added Catalog,
+2026-06-17 — bottom nav now `Lists`/`Catalog`; Add/Search moved off the bottom nav to a List-screen
+`+` affordance) (+ three cross-cutting
 overlays). Table prefix not referenced (this document is flow/screen-level).*

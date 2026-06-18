@@ -180,16 +180,23 @@ it belongs to *either* a `User` *or* a `Family` (`owner_type` = user | family), 
 both. Invariant: a family-owned list is visible to **all** current members of that
 family (Family §5); ownership is fixed at creation in MVP (no transfer flow).
 
-**ListItem** — one line: a reference to a **`UserProduct`** (the demand-first change —
-*not* a canonical product and *not* a free-text string), a desired `Quantity`, an
-`is_checked` flag, and `added_by_user_id` (attribution within a shared list).
-Offline-born items — and the UserProducts they create at write time — carry a
-**`client_uuid`** so replays from the background-sync queue are **idempotent** and
-offline-created entities merge without ID collisions (arch. §6.5, §8). Invariants: an
-item references a `UserProduct`, which is what keeps comparison meaningful (free text
-would defeat it; a *bare* canonical product would defeat broad-by-default); **last-write-
-wins on server `updated_at`** is the conflict rule, surfaced as “updated X sec ago” — no
-real-time sync, no merge-conflict UX in MVP (D §9).
+**ListItem** — one line: a reference to **either** a **`UserProduct`** (a broad term,
+"мляко") **or** a specific **`StoreProduct`** ("Мляко Данон 2% 1л") — **exactly one of
+the two, never both, never free text** (resolved 2026-06-18, D §14 "list_items can
+target a specific StoreProduct directly" — amends the earlier "always UserProduct" rule
+now that the demand-first layers are established and a user may already know the exact
+item) — plus a desired `Quantity`, an `is_checked` flag, and `added_by_user_id`
+(attribution within a shared list). Offline-born items — and any UserProduct/StoreProduct
+they create at write time — carry a **`client_uuid`** so replays from the
+background-sync queue are **idempotent** and offline-created entities merge without ID
+collisions (arch. §6.5, §8). Invariants: an item references a `UserProduct` *or* a
+`StoreProduct`, never a free-text string (free text would defeat comparison entirely);
+choosing the `StoreProduct` path is the user opting into specificity early rather than
+through the matching-by-selection flow (§7) — it does not reopen "no global
+product-catalog picker" (D §14, `10` §2.6/§6.2), since the StoreProduct still has to
+already exist (crawled) or be created by that same user (never browsed from someone
+else's catalog); **last-write-wins on server `updated_at`** is the conflict rule,
+surfaced as "updated X sec ago" — no real-time sync, no merge-conflict UX in MVP (D §9).
 
 **PurchaseLogEntry** — an **append-only** record of one “checked / bought” event
 (D §9): the owner, the `UserProduct`, and a `purchased_at` timestamp; plus a reference to
@@ -236,10 +243,18 @@ resolve into one bucket. Admin **merge/split** of buckets survives only as catal
 hygiene (de-duping two “milk” buckets), *not* a per-offer review step (D §4).
 
 **StoreProduct** — the same goods **as listed by one specific store** (the chain’s own
-naming/listing). It belongs to exactly one `Store` and is the thing a `StoreOffer`
-prices. It may be **temporarily uncategorized** (awaiting categorization) without breaking
-anything — uncategorized store products simply don’t yet appear in any bucket and don’t
-participate in comparison.
+naming/listing). It is the thing a `StoreOffer` prices. It may be **temporarily
+uncategorized** (awaiting categorization) without breaking anything — uncategorized
+store products simply don’t yet appear in any bucket and don’t participate in
+comparison. **`source` distinguishes how the row was born** (resolved 2026-06-18, D §14):
+`crawler` (the original/default path, belongs to exactly one `Store`) or `user` (a
+person manually records a specific item — name required, photo/barcode optional —
+before any crawl has found it; `store_id` is then nullable, no chain pinned yet). A
+later crawl match can backfill `store_id`/`source_external_id` onto an existing
+user-sourced row instead of duplicating it — the same re-categorize-without-re-crawl
+property already true of bucket assignment (§10). A `StoreProduct` is addressable
+**directly** from a `ListItem` (§6) — the user-facing "specific item," as opposed to a
+`UserProduct`'s broad term.
 
 **StoreOffer** — a concrete **offer or promotion** for a `StoreProduct` from one chain —
 the third demand-first layer (D §4). It is what gets categorized into a `CategoryBucket`

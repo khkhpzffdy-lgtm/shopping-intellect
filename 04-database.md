@@ -266,14 +266,16 @@ deduped per normalized term, attaches to a bucket by default, optionally narrows
   and recovers its history) rather than a hard `DELETE`. Hard deletes are therefore
   `RESTRICT`-guarded where referenced.
 
-**`oCk_si_list_items`** — references **layer 1**, never a canonical product and never
-free text (02 §6, D §9).
+**`oCk_si_list_items`** — references **either layer 1 or layer 3 directly**, never
+free text (02 §6, D §9, D §14 "list_items can target a specific StoreProduct directly,"
+2026-06-18).
 
 |Column                     |Type                                  |Why                                                                 |
 |---------------------------|--------------------------------------|--------------------------------------------------------------------|
 |`id`                       |`BIGINT UNSIGNED` PK AI               |                                                                    |
 |`list_id`                  |`BIGINT UNSIGNED NOT NULL`            |FK → `lists.id`                                                     |
-|`user_product_id`          |`BIGINT UNSIGNED NOT NULL`            |FK → `user_products.id` — **replaces the old `product_id`**         |
+|`user_product_id`          |`BIGINT UNSIGNED NULL`                |FK → `user_products.id` — **broad-term path; exactly one of this/`store_product_id` set**|
+|`store_product_id`         |`BIGINT UNSIGNED NULL`                |FK → `store_products.id` — **specific-item path**; nullable counterpart above|
 |`quantity`                 |`DECIMAL(10,3) NOT NULL DEFAULT 1`    |the `Quantity` amount (02 §3)                                       |
 |`unit`                     |`VARCHAR(16) NOT NULL DEFAULT 'piece'`|`g/kg/ml/l/piece/bucket…`; unit normalization is Catalog’s (02 §3)  |
 |`is_checked`               |`TINYINT(1) NOT NULL DEFAULT 0`       |in-list checked state — **separate** from `purchase_log`            |
@@ -282,8 +284,11 @@ free text (02 §6, D §9).
 |`created_at` / `updated_at`|`DATETIME NOT NULL`                   |`updated_at` is the **last-write-wins** field on server clock (D §9)|
 
 - **PK** `id`. **FK** `list_id` → `lists.id` `ON DELETE CASCADE`; **FK** `user_product_id`
-  → `user_products.id` `ON DELETE RESTRICT` (a term still on a list can’t vanish — archive
-  instead). **UNIQUE** `client_uuid`. **Index** `(list_id)` — the list-read path (§5.2).
+  → `user_products.id` `ON DELETE RESTRICT` (a term still on a list can't vanish — archive
+  instead); **FK** `store_product_id` → `store_products.id` `ON DELETE RESTRICT` (same
+  reasoning). **Exactly-one-of invariant is app-level** (enforced in `ListItemRepository`,
+  not a DB `CHECK` — keeps MySQL-version portability, §2.2). **UNIQUE** `client_uuid`.
+  **Index** `(list_id)` — the list-read path (§5.2).
 
 **`oCk_si_purchase_log`** — **append-only**, immutable rows; the *only* substrate for
 recently/frequently-bought (02 §6, D §9).
@@ -340,18 +345,25 @@ admin-seeded, the rest lazily created on demand (D §4, §6.2). Flat in MVP.
 
 **`oCk_si_store_products`** — **layer 3 identity**: the goods as listed by one store,
 stable across weekly crawls (02 §7). **Carries `category_id` — the trust hinge** (see the
-representation note below and §7.4).
+representation note below and §7.4). **`source` distinguishes crawler-born from
+user-born rows** (D §14 "list_items can target a specific StoreProduct directly,"
+2026-06-18) — a user may record a specific item (name only required) before any crawl
+has found it; a later crawl match backfills `store_id`/`source_external_id` onto the
+same row instead of duplicating it.
 
 |Column                     |Type                      |Why                                                                                                                             |
 |---------------------------|--------------------------|--------------------------------------------------------------------------------------------------------------------------------|
 |`id`                       |`BIGINT UNSIGNED` PK AI   |                                                                                                                                |
-|`store_id`                 |`BIGINT UNSIGNED NOT NULL`|FK → `stores.id`; belongs to exactly one store                                                                                  |
+|`store_id`                 |`BIGINT UNSIGNED NULL`    |FK → `stores.id`; **NULL for a not-yet-matched user-born row** (`source='user'`); always set for `source='crawler'`            |
+|`source`                   |`ENUM('crawler','user') NOT NULL DEFAULT 'crawler'`|distinguishes a crawl-discovered row from a user-created one (D §14, 2026-06-18)       |
+|`created_by_user_id`       |`BIGINT UNSIGNED NULL`    |logical ref to `wp_users.ID`; set only when `source='user'`                                                                     |
 |`source_external_id`       |`VARCHAR(190) NULL`       |the chain’s own product/SKU id where the page exposes one — the strongest cross-crawl identity anchor                           |
-|`source_name`              |`VARCHAR(190) NOT NULL`   |name exactly as crawled (Bulgarian)                                                                                             |
+|`source_name`              |`VARCHAR(190) NOT NULL`   |name exactly as crawled, or as typed by the user (Bulgarian)                                                                    |
 |`normalized_name`          |`VARCHAR(190) NOT NULL`   |lowercased, unit/weight extracted; fuzzy-categorization + search input (arch. §8)                                               |
 |`category_id`              |`BIGINT UNSIGNED NULL`    |FK → `categories.id`; **NULL = uncategorized** → product (and its offers) absent from every bucket until categorized (02 §7/§10)|
 |`brand_normalized`         |`VARCHAR(120) NULL`       |best-effort extracted brand token; powers brand-anchored comparison (§7.2)                                                      |
-|`source_url`               |`VARCHAR(512) NULL`       |audit/back-link                                                                                                                 |
+|`image_url`                |`VARCHAR(512) NULL`       |optional product photo (crawled thumbnail, or user-supplied for a manual item)                                                  |
+|`source_url`               |`VARCHAR(512) NULL`       |audit/back-link; NULL for user-born rows                                                                                        |
 |`created_at` / `updated_at`|`DATETIME NOT NULL`       |                                                                                                                                |
 
 - **PK** `id`. **FK** `store_id` → `stores.id`; **FK** `category_id` → `categories.id`

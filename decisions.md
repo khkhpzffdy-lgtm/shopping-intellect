@@ -378,6 +378,61 @@ Recommended Claude settings per document (model: **Opus 4.8** throughout — sam
 - [ ] **Off-host backup download cadence.** `01` §9 says "periodic" without an interval; `09` §7/§8 flags it as unset operational policy. Recommend a concrete cadence (at minimum, before and after any risky release) — **decide & record**.
 - [ ] **Stage-3 managed-DB provider** (PlanetScale / Supabase / RDS) and **Capacitor wrap vs full React Native** — deferred / contingent on measured performance (`03` §5/§7, `08` §5); referenced as open, not pre-selected.
 - [ ] **Multi-member family dissolve.** `D-2` (resolved below) added member self-leave + admin hand-off + solo-family auto-delete, but an explicit **`DELETE /families/{id}`** (an admin dissolving a family that still has other members) is **not** added — decide whether MVP needs it, or members are removed/leave individually first. (`06` §6.6)
+- [ ] **FLAG — "Recipes" tab vs the MVP exclusion list.** The owner's 2026-06-17 navigation note names a future bottom-nav `Recipes` tab alongside `Offers`. `11-user-flows.md` §"Open for design" (closing notes) currently lists **recipes/meal-plan as a deliberately-excluded MVP surface**. Not reconciled here at the owner's request — **flagged only**; resolve explicitly (either retire the exclusion or drop/rename the future tab) before building a Recipes screen.
+
+### Resolved — list_items can target a specific StoreProduct directly (2026-06-18)
+
+The owner wants two equally-valid ways to populate a list: a **broad term**
+("мляко" — a `UserProduct`, unchanged) and a **specific item** ("Мляко Данон
+2% 1л" — a concrete `StoreProduct`), without forcing the specific item to be
+represented "under" an artificial UserProduct term. Closed as follows:
+
+- [x] **`list_items` gains a nullable `store_product_id` alongside the existing
+  `user_product_id`; exactly one of the two is set per row** (app-level
+  invariant, enforced in `ListItemRepository`, not a DB `CHECK` — keeps
+  MySQL-version portability per `04` §2.2). This **amends** the prior iron
+  rule "list_items references `user_product_id`, never a canonical product
+  directly" (`CLAUDE.md` §2.6, `02` §6) — the rule's intent (never free text,
+  never the *old* single canonical `Product`) is preserved; what changes is
+  that `StoreProduct` (the demand-first layer-3 identity, not the retired
+  single-`Product` model) is now also a valid, *direct* target. No regression
+  to demand-first: a UserProduct still attaches broadly to a `CategoryBucket`
+  by default, and Add/Search still searches only the owner's own terms — this
+  only adds a second, equally-direct path for when the user already knows the
+  exact item.
+- [x] **`StoreProduct` gains a `source` enum (`crawler` | `user`)** so the same
+  table/identity serves both crawl-discovered items and items a user manually
+  creates (name only required; photo + barcode optional) before any crawler
+  has found that exact item. A user-created `StoreProduct` has `store_id`
+  nullable (no specific chain pinned) and `created_by_user_id` set; a future
+  crawl match can later backfill `store_id`/`source_external_id` onto the same
+  row rather than creating a duplicate (re-categorization-friendly, consistent
+  with the existing "re-categorize without re-crawl" property, `02` §10).
+- [x] **Not every UserProduct needs a StoreProduct, and vice versa.** "Краставици"
+  may only ever exist as a bare UserProduct (no specific branded item) — this
+  is normal, not a gap the crawler must fill. The two layers are independent;
+  a list mixes both freely.
+- [x] **Both row types render in the same list, same UI, same offline-sync
+  pipeline** — `client_uuid` idempotency, optimistic local-first writes, and
+  last-write-wins all apply identically regardless of which FK is set. Detail
+  screens differ by type (UserProduct: term + category + favorite; StoreProduct:
+  name + photo + barcode + optional brand link), but list rendering/checking/
+  removal is type-agnostic.
+- [x] **List deletion is a hard delete of the list row and its `list_items`
+  rows only** — never the `user_products`/`store_products` they reference
+  (those persist for reuse/history independent of any one list, consistent
+  with `user_products.is_archived` soft-delete already protecting term
+  history). (`04` §4.3)
+
+### Resolved — Profile screen, v1 scope (2026-06-18)
+
+- [x] **Profile screen v1** = account info (display name, email) + the
+  existing theme toggle (moved from the Lists app bar, `HomeScreen`'s
+  `store/theme.ts` wiring unchanged) + logout (moved from the Lists app bar).
+  **No family management in v1** — family endpoints don't exist yet (`06` §6.6
+  is speculative; `UserProductController` only has a TODO for family
+  enforcement). Family-in-Profile is deferred to when `§2.4` (Family slice)
+  actually ships a backend.
 
 ### Resolved — demand-first consolidation (folded back from `04` / `06` / `08`)
 
@@ -415,6 +470,7 @@ Screen-state / component-level UX resolutions from `10-ux-rules.md` (§§1–7).
 - [x] **Inbound family invitations are accepted via the emailed token deep-link** — **no in-app pending-invitations inbox** in MVP. (`10` §4.5)
 - [x] **No standalone purchase-history screen in MVP** — `purchase_log` surfaces to users only as recently / frequently bought. (`10` §6.4)
 - [x] **Owner-context rule for surfaced metadata** — the favorites / recent / frequent shown while adding to a list are scoped to **that list's owner** (family vs user), not the logged-in user globally. (`10` §4.2)
+- [x] **Bottom navigation becomes destinations, not actions** (2026-06-17). The bottom nav holds only *browse* destinations (`Lists`, `Catalog`, and later `Offers`); it does **not** hold "Add". "Add to list" is an in-context action reached via a **`+` affordance on the List screen**, opening Add/Search as an overlay/sub-screen scoped to that list — never a standalone bottom-nav tab. **`Catalog` is a new screen**: a browse-only list of category buckets (`GET /categories`, `06` §6.5) with **no connection to list-adding and no prices/offers** — it is a pure taxonomy browse, distinct from the future `Offers` tab (which will surface `GET /promotions`, already specced in `06` §6.5 but not yet built). This does **not** reopen the "no global product-catalog picker" rule (`10` §2.6/§6.2, this file above): picking a category in Catalog never creates or attaches a UserProduct — Add/Search (now reached from the List screen) remains the only path that creates one, still scoped to the owner's own terms. (`10` §2.6, §6, Component Inventory §8; `11` Part B screen inventory)
 
 ### Resolved — D-1 brand-chip label · D-2 family membership lifecycle
 

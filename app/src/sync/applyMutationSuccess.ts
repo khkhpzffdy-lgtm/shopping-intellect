@@ -1,9 +1,11 @@
 import {
   getList,
   getListItem,
+  getStoreProductByClientUuid,
   getUserProduct,
   putList,
   putListItem,
+  putStoreProduct,
   putUserProduct,
   type MutationQueueRecord
 } from '../storage/db';
@@ -20,6 +22,9 @@ type CreateListItemResponse = {
     is_checked?: boolean;
   };
   user_product?: {
+    id?: string;
+  };
+  store_product?: {
     id?: string;
   };
 };
@@ -53,8 +58,11 @@ export const applyMutationSuccess = async (
       return;
     }
 
-    const userProduct = await getUserProduct(item.user_product_client_uuid);
     const createItemResponse = response as CreateListItemResponse | undefined;
+
+    const userProduct = item.user_product_client_uuid
+      ? await getUserProduct(item.user_product_client_uuid)
+      : null;
 
     if (userProduct) {
       await putUserProduct({
@@ -63,11 +71,23 @@ export const applyMutationSuccess = async (
       });
     }
 
+    const storeProduct = item.store_product_client_uuid
+      ? await getStoreProductByClientUuid(item.store_product_client_uuid)
+      : null;
+
+    if (storeProduct) {
+      await putStoreProduct({
+        ...storeProduct,
+        id: createItemResponse?.store_product?.id ?? storeProduct.id
+      });
+    }
+
     await putListItem({
       ...item,
       id: createItemResponse?.item?.id ?? item.id,
       is_checked: createItemResponse?.item?.is_checked ?? item.is_checked,
-      user_product_id: createItemResponse?.user_product?.id ?? item.user_product_id
+      user_product_id: createItemResponse?.user_product?.id ?? item.user_product_id,
+      store_product_id: createItemResponse?.store_product?.id ?? item.store_product_id
     });
   }
 };

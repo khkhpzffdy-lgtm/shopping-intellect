@@ -131,7 +131,6 @@ export const AddSearchScreen = ({ selectedList, onItemAdded, isActive = true }: 
       });
 
       setQuery('');
-      onItemAdded();
 
       try {
         const claimedMutation = await markMutationInFlight(itemClientUuid);
@@ -140,6 +139,8 @@ export const AddSearchScreen = ({ selectedList, onItemAdded, isActive = true }: 
         }
       } catch {
         // queued — will sync on next drain
+      } finally {
+        onItemAdded();
       }
     } finally {
       setAdding(false);
@@ -215,8 +216,6 @@ export const AddSearchScreen = ({ selectedList, onItemAdded, isActive = true }: 
         entity_client_uuid: itemClientUuid
       });
 
-      onItemAdded();
-
       try {
         const claimedMutation = await markMutationInFlight(itemClientUuid);
         if (claimedMutation) {
@@ -224,6 +223,8 @@ export const AddSearchScreen = ({ selectedList, onItemAdded, isActive = true }: 
         }
       } catch {
         // queued — will sync on next drain
+      } finally {
+        onItemAdded();
       }
     } finally {
       setAdding(false);

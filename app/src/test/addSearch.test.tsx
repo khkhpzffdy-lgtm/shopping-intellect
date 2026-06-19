@@ -69,7 +69,29 @@ describe('AddSearchScreen — search', () => {
     await userEvent.type(input, 'мляко');
 
     expect(await screen.findByText('мляко')).toBeInTheDocument();
-    expect(screen.queryByTestId('add-new-term')).not.toBeInTheDocument();
+  });
+
+  test('shows both "добави нов термин" and "добави конкретен артикул" even when a term matches', async () => {
+    await putUserProduct({
+      client_uuid: 'up-1',
+      owner_type: 'user',
+      owner_id: 7,
+      term: 'мляко',
+      normalized_term: 'мляко',
+      created_at: '2026-06-17T09:00:00.000Z'
+    });
+    mockedApiRequest.mockResolvedValueOnce({ user_products: [
+      { client_uuid: 'up-1', owner_type: 'user', owner_id: 7, term: 'мляко', normalized_term: 'мляко', created_at: '2026-06-17T09:00:00.000Z' }
+    ] });
+
+    render(<AddSearchScreen selectedList={mockList} onItemAdded={() => {}} />);
+
+    const input = await screen.findByLabelText('Търси термин');
+    await userEvent.type(input, 'мляко');
+
+    expect(await screen.findByText('мляко')).toBeInTheDocument();
+    expect(screen.getByTestId('add-new-term')).toBeInTheDocument();
+    expect(screen.getByTestId('add-specific-item')).toBeInTheDocument();
   });
 
   test('shows "добави нов" affordance when query has no match', async () => {

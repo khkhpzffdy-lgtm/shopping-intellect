@@ -130,6 +130,7 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 | §2.6 | Delete a list (hard delete, items/terms survive) | ✅ done |
 | §2.7 | Rename a list (inline app-bar edit, `PATCH /lists/{id}`) | ✅ done |
 | §4.0c | Manual StoreProduct creation (specific item path, `list_items.store_product_id`) | ✅ done |
+| §4.0c-fix | "Добави конкретен артикул" button no longer hidden on term match | ✅ done |
 
 **App (`app/`):** Vite + React PWA, FTP deploy wired. Implemented so far:
 - `AuthScreen` — register/login screen, working against the plugin's auth endpoints
@@ -396,22 +397,43 @@ slice (the `categories` table and its seed already existed from `§0.4`), so no
 deactivate/reactivate step is required — `GET /categories` should work immediately once the
 plugin's `main` branch FTP-deploys.
 
-**Build order (2026-06-18, revised — added §4.0d):** §3.1 (done) → §4.0 (done) → §2.3a (done) → §2.3b (done) → §2.3c (done)
-→ §2.2d (done) → §2.3d (done) → §4.0b (done) → §2.6 (done) → §2.7 (done) → §4.0c (done) → **§2.8 (next) → §4.0d → §2.9** →
+**Build order (2026-06-19, revised — added §4.0c-fix):** §3.1 (done) → §4.0 (done) → §2.3a (done) → §2.3b (done) → §2.3c (done)
+→ §2.2d (done) → §2.3d (done) → §4.0b (done) → §2.6 (done) → §2.7 (done) → §4.0c (done) →
+§4.0c-fix (done) →
+**§4.0e (next) → §4.0f → §2.8 → §4.0d → §2.9** →
 §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 (Family) → §2.5 (Favorites) → M5.
-**2026-06-18 re-sequencing:** the Owner asked for list management (delete/rename), item/
+**2026-06-18/19 re-sequencing:** the Owner asked for list management (delete/rename), item/
 product detail management, Catalog product management, and a Profile screen to be fully
-solid **before** any store-offer matching work starts — so §2.6/§2.7/§4.0c/§2.8/§4.0d/
-§2.9 (new Slices, see `13-implementation-line.md`) are inserted ahead of §3.2. §4.0c is
-also a real schema/iron-rule amendment: `list_items` can now reference a `StoreProduct`
-directly (a specific item, e.g. "Мляко Данон 2% 1л"), not just a `UserProduct` (a broad
-term, "мляко") — see `decisions.md` "Resolved — list_items can target a specific
-StoreProduct directly" (2026-06-18) for the full rationale and schema delta
-(`list_items.store_product_id`, `store_products.source`/`created_by_user_id`/
-`image_url`). **§4.0d (added later same day) amends the 2026-06-17 "Catalog has no
-connection to list-adding" rule** — Catalog becomes the owner's own product/item manager,
-grouped by bucket, not just a read-only taxonomy browse; see `decisions.md` "Resolved —
-Catalog becomes 'browse my products'" for the full rationale and the new
+solid **before** any store-offer matching work starts — so §2.6/§2.7/§4.0c/§4.0e/§4.0f/
+§2.8/§4.0d/§2.9 (new Slices, see `13-implementation-line.md`) are inserted ahead of §3.2.
+§4.0c is also a real schema/iron-rule amendment: `list_items` can now reference a
+`StoreProduct` directly (a specific item, e.g. "Мляко Данон 2% 1л"), not just a
+`UserProduct` (a broad term, "мляко") — see `decisions.md` "Resolved — list_items can
+target a specific StoreProduct directly" (2026-06-18) for the full rationale and schema
+delta (`list_items.store_product_id`, `store_products.source`/`created_by_user_id`/
+`image_url`). **§4.0e (added 2026-06-19) is a second, larger schema amendment**:
+`categories.parent_id` for unlimited-depth nesting, a `product_categories` junction table
+replacing the single `category_id` FK on `user_products`/`store_products` (including the
+one §4.0c just added on `store_products` — retired one migration later, before any
+shipped UI relied on it), a third `user_products.owner_type` value `'system'` +
+`is_global_default` flag, and a one-time seed of ~300 generic products from
+`shopping_intellect_mvp_starter_catalog_v1 2.md`. See `decisions.md` "Resolved —
+unlimited-depth categories, many-to-many product↔category, and seeded default products"
+(2026-06-19) for the full rationale. **§4.0f (added 2026-06-19) fixes a real bug found
+in §4.0c**: two different users typing the same specific item each got their own
+`store_products` row, with no cross-user dedupe — defeating StoreProduct's purpose as a
+shared identity. Adds exact-`normalized_name` dedupe across all users (not fuzzy-match-
+with-confirmation, which would reopen the "no yes/no matching dialogs" rule, D §4) plus
+an async Gemini API call (the project's first LLM integration; usage-based cost, a
+deliberate exception to D §5's "€0 additional infra in Stage 1") that extracts
+brand/size/variant/category metadata from the free-text name *after* the item is already
+usable — never blocking the optimistic add. See `decisions.md` "Resolved — StoreProduct
+dedupe across users + async Gemini metadata extraction" (2026-06-19) for the full
+rationale. **§4.0d (added 2026-06-18, now also depends on §4.0e) amends the 2026-06-17
+"Catalog has no connection to list-adding" rule** — Catalog becomes the owner's own
+product/item manager, grouped by bucket (now via the junction table, with child-bucket
+drill-down), not just a read-only taxonomy browse; see `decisions.md` "Resolved —
+Catalog becomes 'browse my products'" for the full rationale and the
 `store_products.is_archived` column it needs. §3.2/§3.3 (ingestion + cron) still follow
 immediately after, so real offers are in the DB before §4.1 ships. §2.3a/
 §2.3b/§2.3c jumped the queue ahead of §2.2d on 2026-06-17 — see incident note immediately
@@ -495,7 +517,34 @@ above (confirmed via `git stash` that "deleting a list while offline..." hangs t
 on unmodified `main`) — not introduced by this slice. `npx tsc --noEmit` and `npm run build`
 both pass. Pushed to `main` in both repos.
 
-**§4.0c is done (2026-06-18).** Manual StoreProduct creation — the "specific item" path,
+**§4.0c-fix is done (2026-06-19).** Fixed the bug below: `AddSearchScreen.tsx`'s
+`noMatch` (`query.trim() !== '' && results.length === 0`) gated **both** the "нов
+термин" and "конкретен артикул" buttons on `results.length === 0`, hiding both
+whenever any UserProduct term partially matched the query. Replaced with `hasQuery`
+(`query.trim() !== ''`) — both buttons now render whenever the query is non-empty,
+independent of `results`, per the Owner's explicit instruction ("и двата бутона винаги
+видими, когато има текст"). No change to matching logic, `addNewTerm`, or
+`addManualStoreProduct` — visibility-only. `addSearch.test.tsx`: removed the now-wrong
+assertion that `add-new-term` is absent on a match, and added a new test asserting both
+`add-new-term` and `add-specific-item` render when a term matches. `npx tsc --noEmit`
+and `npm run build` both pass. The full `addSearch.test.tsx` file fails entirely in
+this sandbox on the pre-existing, environment-specific `btoa` "Invalid character" issue
+(Node 25's stricter `btoa` rejecting the Cyrillic display name in the test fixture) —
+confirmed via `git stash` identical on unmodified `main`, same issue flagged in the
+§4.0c entry below; all other test files (`bottomNav`, `db`, `theme`, `connectivity`,
+`offlineBanner`, `syncStatusIndicator`, `catalogScreen`) pass clean. Pushed to `main`.
+
+**Original bug report (2026-06-19) — "Добави конкретен артикул" button is hidden whenever any
+UserProduct term partially matches the search text.** `AddSearchScreen.tsx`'s `noMatch`
+(`query.trim() !== '' && results.length === 0`) gated **both** the "нов термин" and the
+"конкретен артикул" buttons identically. Since `results` matching is substring-`includes`
+(line ~79-80), typing "мляко" when the Owner already has a UserProduct term "мляко" made
+`results.length > 0` → `noMatch === false` → **neither** button rendered, including the
+manual-StoreProduct one, which should always be offered regardless of term matches. This is
+why the Owner saw "no button" testing §4.0c on shopping.flux.bg; not a deploy/migration
+issue, a real frontend logic bug. **Fixed above.**
+
+**§4.0c is done (2026-06-18), with the above bug found 2026-06-19.** Manual StoreProduct creation — the "specific item" path,
 alongside the existing broad-term path, in Add/Search. **Backend (plugin repo):** new
 migration `AllowDirectStoreProductListItemsMigration` (id `6`) makes `list_items.user_product_id`
 nullable, adds `list_items.store_product_id` (nullable, FK `RESTRICT`), makes

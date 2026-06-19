@@ -255,7 +255,7 @@ export const AddSearchScreen = ({ selectedList, onItemAdded, isActive = true }: 
     await addItemViaStoreProduct(storeProduct);
   };
 
-  const noMatch = query.trim() !== '' && results.length === 0;
+  const hasQuery = query.trim() !== '';
 
   if (!selectedList) {
     return (
@@ -313,7 +313,7 @@ export const AddSearchScreen = ({ selectedList, onItemAdded, isActive = true }: 
             </button>
           ))}
 
-          {noMatch ? (
+          {hasQuery ? (
             <button
               type="button"
               className="addsearch__addnew"
@@ -326,7 +326,7 @@ export const AddSearchScreen = ({ selectedList, onItemAdded, isActive = true }: 
             </button>
           ) : null}
 
-          {noMatch && !showManualForm ? (
+          {hasQuery && !showManualForm ? (
             <button
               type="button"
               className="addsearch__addnew"

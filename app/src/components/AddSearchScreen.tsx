@@ -251,6 +251,7 @@ export const AddSearchScreen = ({ selectedList, onItemAdded, isActive = true }: 
     setManualName('');
     setManualPhotoUrl('');
     setManualBarcode('');
+    setQuery('');
     await addItemViaStoreProduct(storeProduct);
   };
 

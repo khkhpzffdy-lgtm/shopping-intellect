@@ -370,12 +370,24 @@ export const AddSearchScreen = ({ selectedList, onItemAdded, isActive = true }: 
                 placeholder="Баркод (по избор)"
                 className="addbar__field"
               />
-              <button type="submit" disabled={adding || !manualName.trim()} data-testid="manual-store-product-submit">
-                Добави
-              </button>
-              <button type="button" onClick={() => setShowManualForm(false)} disabled={adding}>
-                Отказ
-              </button>
+              <div className="addsearch__manualform-actions">
+                <button
+                  type="submit"
+                  className="addsearch__manualform-submit"
+                  disabled={adding || !manualName.trim()}
+                  data-testid="manual-store-product-submit"
+                >
+                  Добави
+                </button>
+                <button
+                  type="button"
+                  className="addsearch__manualform-cancel"
+                  onClick={() => setShowManualForm(false)}
+                  disabled={adding}
+                >
+                  Отказ
+                </button>
+              </div>
             </form>
           ) : null}
         </div>

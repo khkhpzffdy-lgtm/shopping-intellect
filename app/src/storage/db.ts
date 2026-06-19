@@ -67,8 +67,10 @@ const DB_VERSION = 2;
 
 const normalizeTerm = (term: string) => term.trim().toLocaleLowerCase('bg-BG');
 
-const getDb = () =>
-  openDB(DB_NAME, DB_VERSION, {
+let dbPromise: ReturnType<typeof openDB> | null = null;
+
+const getDb = () => {
+  dbPromise ??= openDB(DB_NAME, DB_VERSION, {
     upgrade(db) {
       if (!db.objectStoreNames.contains('lists')) {
         db.createObjectStore('lists', { keyPath: 'client_uuid' });
@@ -85,8 +87,23 @@ const getDb = () =>
       if (!db.objectStoreNames.contains('mutation_queue')) {
         db.createObjectStore('mutation_queue', { keyPath: 'client_uuid' });
       }
+    },
+    blocking() {
+      // This connection is the older one blocking a newer tab/instance's
+      // upgrade — close it so that tab can proceed instead of hanging.
+      dbPromise?.then((db) => db.close());
+      dbPromise = null;
+    },
+    blocked() {
+      // A stale connection elsewhere (another tab/PWA instance on an older
+      // schema version) is blocking this upgrade and openDB() would hang
+      // silently forever otherwise. Reloading is the most reliable recovery.
+      window.location.reload();
     }
   });
+
+  return dbPromise;
+};
 
 export const getLists = async () => {
   const db = await getDb();

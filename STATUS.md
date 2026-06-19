@@ -788,6 +788,31 @@ see Olympus/1л/2%-style fields appear immediately while testing with a real (fr
 Gemini API key, and free-tier rate limits (~15 RPM) will be hit fast if synchronous mode
 is left on under real traffic.
 
+**§4.0f follow-up #2 (2026-06-19): "Test Gemini connection" button on the settings page.**
+The Owner wanted a quick way to verify the Gemini key/model work *before* relying on the
+production add-item flow to surface problems. `Admin/GeminiSettingsPage.php` gained a
+second form below the existing settings form — a "Test connection" section with a
+secondary-style "Test Gemini connection" button, disabled if no API key is saved yet.
+Submitting it posts to a new `admin_post_si_gemini_test_connection` handler
+(`GeminiSettingsPage::handleTestConnection()`, capability-checked + nonce-verified via
+`check_admin_referer`), which builds a `GeminiMetadataExtractor` from the **currently
+saved** key/model (not whatever's typed but unsaved in the form) and calls
+`extract()` on a fixed sample string, `"Мляко Олимпус 2% 1л"`. Since
+`GeminiMetadataExtractor::extract()` never throws — every failure mode (bad key, wrong
+model name, network error, unparseable response) collapses into "all four fields come
+back null" — that's the one signal available to distinguish success from failure here:
+all-null renders a yellow `notice-warning` ("Gemini responded with nothing usable...");
+anything else renders a green `notice-success` listing the extracted
+brand/size/variant/category inline. Result is passed back via a `wp_safe_redirect` with
+the values in the query string (sanitized through `sanitize_text_field` on read), so a
+page reload doesn't resubmit the test. **This is a real, metered Gemini API call** — same
+quota/cost as a production extraction, not a stub — so don't click it repeatedly. No new
+tests (admin-page rendering wired to live WP functions, consistent with
+`GoogleSettingsPage`/the rest of `GeminiSettingsPage` having no PHPUnit coverage either —
+this class's logic is exercised by the already-tested `GeminiMetadataExtractor` it calls
+into). All 139 PHPUnit tests still pass (unchanged count — no new testable logic, just
+wiring). Pushed to `main`. **No new migration.**
+
 **2026-06-17 production incident — sync pipeline, four stacked bugs.** Every list/item was stuck
 `sync-pending` forever. Root-caused and fixed live (outside the normal Slice flow, by explicit
 Owner direction, since it was actively breaking production):

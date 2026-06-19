@@ -754,6 +754,40 @@ acceptance criteria (cross-user dedupe via DB query; manual item add stays insta
 new settings page persists a saved key/model; a real Gemini key + a cron run populates
 extracted fields) is outstanding.
 
+**§4.0f follow-up (2026-06-19): optional synchronous Gemini test mode.** The Owner wants
+to test the Gemini integration immediately after creating each item, without waiting for
+a cron cycle or a real crontab entry to exist yet. Added a **wp-admin-only opt-in**, not a
+permanent architecture change — `si_gemini_sync_test_mode` (new checkbox on Settings →
+SI Gemini API, "Extract synchronously (testing only)", off by default). When checked,
+`StoreProductService::findOrCreate` calls `StoreProductMetadataService::processOne()`
+(new method, factored out of `processPending()`'s loop body so both share the same
+extract → updateMetadata → category-attach logic) inline, right after insert, and returns
+the re-fetched row with metadata already populated — **this blocks the add-to-list
+request on the Gemini round-trip**, a deliberate, explicit exception to the offline-
+first/optimistic-add iron rule (CLAUDE.md §2), scoped to manual testing only. When the
+checkbox is off (the default, and the only state anyone should ship/leave running),
+behavior is byte-for-byte the same as the original §4.0f: `findOrCreate` returns
+immediately, Gemini only runs later via `bin/extract-metadata.php`.
+`StoreProductService` gained two new optional trailing constructor params
+(`?StoreProductMetadataService $metadataService = null`, `bool $syncMetadataExtraction =
+false`) — both default to "off," so the one existing call site in `Plugin.php` needed an
+explicit wiring change to turn it on, and no other code or test had to change to keep the
+old behavior. `ConfigInterface`/`Config` gained `geminiSyncTestMode(): bool`
+(`get_option('si_gemini_sync_test_mode', '') === '1'`). `Plugin.php` only constructs the
+`GeminiMetadataExtractor`/`StoreProductMetadataService` pair when the flag is on, so a
+normal request with the checkbox unchecked does zero extra work. New tests:
+`StoreProductServiceTest::testFindOrCreateRunsGeminiSynchronouslyWhenTestModeEnabled`
+(fake Gemini HTTP client, asserts the returned StoreProduct already has
+brand/size/variant/extracted-at populated) and
+`::testFindOrCreateSkipsGeminiWhenTestModeDisabled` (fake client throws if ever called —
+proves Gemini is never touched when the flag is off, the production-default path). All
+139 PHPUnit tests pass (was 137). Pushed to `main`. **No new migration** — this is
+config/wiring only. **Reminder for whoever flips the checkbox on:** turn it back off
+before considering the feature "live" for real users; it exists solely so the Owner can
+see Olympus/1л/2%-style fields appear immediately while testing with a real (free-tier)
+Gemini API key, and free-tier rate limits (~15 RPM) will be hit fast if synchronous mode
+is left on under real traffic.
+
 **2026-06-17 production incident — sync pipeline, four stacked bugs.** Every list/item was stuck
 `sync-pending` forever. Root-caused and fixed live (outside the normal Slice flow, by explicit
 Owner direction, since it was actively breaking production):

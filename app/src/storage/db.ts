@@ -14,11 +14,13 @@ export type ShoppingListRecord = {
 export type UserProductRecord = {
   client_uuid: string;
   id?: string;
-  owner_type: 'user';
+  owner_type: 'user' | 'system';
   owner_id: number;
   term: string;
   normalized_term: string;
   created_at: string;
+  category_ids?: string[];
+  is_global_default?: boolean;
 };
 
 export type StoreProductRecord = {

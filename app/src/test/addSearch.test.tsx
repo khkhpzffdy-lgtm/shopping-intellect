@@ -94,6 +94,27 @@ describe('AddSearchScreen — search', () => {
     expect(screen.getByTestId('add-specific-item')).toBeInTheDocument();
   });
 
+  test('shows a system-owned seeded term in search results without the owner ever creating it', async () => {
+    mockedApiRequest.mockResolvedValueOnce({ user_products: [
+      {
+        client_uuid: 'seed-uuid-1',
+        owner_type: 'system',
+        owner_id: 0,
+        term: 'Домати',
+        normalized_term: 'домати',
+        created_at: '2026-06-19T09:00:00.000Z',
+        is_global_default: true
+      }
+    ] });
+
+    render(<AddSearchScreen selectedList={mockList} onItemAdded={() => {}} />);
+
+    const input = await screen.findByLabelText('Търси термин');
+    await userEvent.type(input, 'домати');
+
+    expect(await screen.findByText('Домати')).toBeInTheDocument();
+  });
+
   test('shows "добави нов" affordance when query has no match', async () => {
     mockedApiRequest.mockResolvedValueOnce({ user_products: [] });
 

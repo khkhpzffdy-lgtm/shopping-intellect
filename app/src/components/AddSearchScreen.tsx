@@ -60,7 +60,7 @@ export const AddSearchScreen = ({ selectedList, onItemAdded, isActive = true }: 
       }
 
       const local = await getAllUserProducts();
-      setAllTerms(local.filter((t) => t.owner_id === user.id));
+      setAllTerms(local.filter((t) => t.owner_id === user.id || t.owner_type === 'system'));
     };
 
     void loadTerms();

@@ -131,6 +131,7 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 | §2.7 | Rename a list (inline app-bar edit, `PATCH /lists/{id}`) | ✅ done |
 | §4.0c | Manual StoreProduct creation (specific item path, `list_items.store_product_id`) | ✅ done |
 | §4.0c-fix | "Добави конкретен артикул" button no longer hidden on term match | ✅ done |
+| §4.0e | Unlimited-depth categories, many-to-many product↔category, seeded ~300 default products | ✅ done — **migration not yet run on prod, see note below** |
 
 **App (`app/`):** Vite + React PWA, FTP deploy wired. Implemented so far:
 - `AuthScreen` — register/login screen, working against the plugin's auth endpoints
@@ -399,8 +400,8 @@ plugin's `main` branch FTP-deploys.
 
 **Build order (2026-06-19, revised — added §4.0c-fix):** §3.1 (done) → §4.0 (done) → §2.3a (done) → §2.3b (done) → §2.3c (done)
 → §2.2d (done) → §2.3d (done) → §4.0b (done) → §2.6 (done) → §2.7 (done) → §4.0c (done) →
-§4.0c-fix (done) →
-**§4.0e (next) → §4.0f → §2.8 → §4.0d → §2.9** →
+§4.0c-fix (done) → §4.0e (done) →
+**§4.0f (next) → §2.8 → §4.0d → §2.9** →
 §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 (Family) → §2.5 (Favorites) → M5.
 **2026-06-18/19 re-sequencing:** the Owner asked for list management (delete/rename), item/
 product detail management, Catalog product management, and a Profile screen to be fully
@@ -608,6 +609,79 @@ bar used in every prior "flaky in this sandbox" note above. Pushed to `main` in 
 Activate on Shopping Intellect, then confirm via Tools → SI Schema Status that `schema_version`
 is `6`. Owner verification on shopping.flux.bg of this slice's acceptance criteria is
 outstanding.**
+
+**§4.0e is done (2026-06-19).** Unlimited-depth categories, many-to-many product↔category, and
+~300 seeded default products. **Backend (plugin repo, pushed to `main`):** new migration
+`AddCategoryHierarchyAndProductCategoriesMigration` (id `7`) does, in order: (1) adds
+`categories.parent_id` (self-FK, `ON DELETE SET NULL`, indexed) for unlimited-depth nesting —
+**no depth limit enforced anywhere in code**; (2) creates `oCk_si_product_categories` (nullable
+`user_product_id`/`store_product_id`, `category_id`, two unique indexes), migrates every existing
+single-FK `category_id` row from `user_products`/`store_products` into it, then drops the
+`category_id` column from both tables; (3) widens `user_products.owner_type` to
+`ENUM('user','family','system')` and adds `is_global_default`; (4) inserts the 25 new root
+categories from `shopping_intellect_mvp_starter_catalog_v1 2.md`'s Category column (slugs:
+`fruits`, `vegetables`, `dairy_products`, `meat`, `cold_cuts_deli`, `fish_seafood`,
+`bread_bakery`, `pantry_staples`, `canned_jarred`, `spices_baking`, `oils_sauces`,
+`sweets_desserts`, `nuts_snacks`, `coffee_tea`, `soft_drinks`, `alcohol`, `frozen_foods`,
+`ready_meals`, `home_cleaning`, `personal_care`, `cosmetics`, `baby`, `pets`, `health_pharmacy`,
+`seasonal_kitchen_supplies`), then re-parents 19 of the 20 existing `§0.4`-seeded categories
+underneath them by the Owner's exact mapping (2026-06-19) — **`eggs` deliberately stays a root
+category with no parent**, no matching bucket exists in the new 25; (5) seeds exactly 300
+`system`-owned, `is_global_default=1` `user_products` rows (`owner_id=0`), each linked via the
+junction table to its file-specified category, `term`/`normalized_term` taken directly from the
+file's Product column (Default unit/Quantity suggestions/alias columns are **not** modelled, per
+`decisions.md`'s explicit scope note). `Models/Category.php` gained `parentId`;
+`CategoryRepositoryInterface`/`WpdbCategoryRepository` gained `findChildren(int): array` (flat
+one-level query, no recursive ancestor/descendant chain yet — that's a future slice's job).
+`Models/UserProduct.php`/`Models/StoreProduct.php` lost `categoryId` entirely — category
+membership now lives only in the junction table, read via the new
+`UserProductRepositoryInterface::categoryIdsFor()`/`attachCategory()`/`listGlobalDefaults()`
+methods (kept deliberately minimal — no full CRUD API yet). `UserProductController`'s
+`GET /user-products` now merges `listGlobalDefaults()` into the caller's own
+`listByOwner()` results, so every account sees the seeded terms without any extra request, and
+its response shape replaces `category_id` (singular, nullable) with `category_ids` (array) —
+also gained `client_uuid`/`owner_id`/`created_at` fields it was missing before (needed so the
+frontend's `putUserProduct` can actually cache a fetched seeded term locally; this was a latent
+gap that would have silently broken the very acceptance criteria this slice introduces).
+`ListController`'s two `category_id` read sites were updated the same way.
+`ListService::resolveExistingUserProduct` now allows adding a `system`-owned, global-default
+term to **any** owner's list (previously only an exact owner_type/owner_id match was accepted,
+which would have rejected every seeded term) — D §14's "adding a seeded product to a list...
+[is] unaffected" rule. New `UserProductService::archive()` + `UserProductForbiddenException`
+enforce that an ordinary user can never archive a `system`-owned row (no edit/archive UI exists
+yet — `§2.8`/`§4.0d`'s job — this is the guard method those future slices will call). The
+PHPUnit `SqliteWpdb` test stub gained `categories.parent_id` (with FK), a new
+`product_categories` table (with FKs), `user_products.is_global_default`, and lost
+`category_id` from both `user_products`/`store_products`. Every existing test constructing a
+`new UserProduct(...)`/`new StoreProduct(...)` positionally needed its now-removed `categoryId`
+argument dropped — mechanical, all call sites updated. New tests: `MigratorTest` (25 root
+categories inserted; 19 of 20 existing categories re-parented and `eggs` excluded; ~300 seed
+rows + matching junction rows), new `WpdbCategoryRepositoryTest` (`findChildren`,
+`parentId` hydration), `WpdbUserProductRepositoryTest` (`listGlobalDefaults`
+filtering, `attachCategory`/`categoryIdsFor` round-trip),
+`UserProductServiceTest` (`archive()` rejects a system-owned row, succeeds for the owner's own,
+rejects another user's), `ListControllerTest` (adding a system-owned term to a list succeeds),
+`UserProductControllerTest` (`category_ids` is an array; `GET /user-products` merges in a
+seeded global default alongside the caller's own term). All 122 PHPUnit tests pass (was 109).
+**Frontend (app repo, pushed to `main`):** `UserProductRecord.owner_type` widened to
+`'user' | 'system'`, gained optional `category_ids`/`is_global_default`; `AddSearchScreen.tsx`'s
+`loadTerms` filter changed from `t.owner_id === user.id` to
+`t.owner_id === user.id || t.owner_type === 'system'` so seeded terms actually appear in search
+results. New `addSearch.test.tsx` case asserts a system-owned seeded term shows up in results
+without the Owner ever creating it. `npx tsc --noEmit` and `npm run build` both pass; the
+unaffected test files (`bottomNav`, `db`, `theme`, `connectivity`, `offlineBanner`,
+`syncStatusIndicator`, `catalogScreen`, `sendMutation`) all pass clean. `addSearch.test.tsx`'s
+whole-file run and one `flush.test.ts` case still hit the same pre-existing, environment-specific
+sandbox failures flagged in every prior slice's notes above (Node 25 `btoa`/Cyrillic in this
+file's `beforeEach`; a timing-sensitive concurrent-drain assertion in `flush.test.ts`) —
+confirmed via `git stash` identical on unmodified `main` before this slice's changes.
+**This slice adds migration id `7` — after deploy, the Owner must go to wp-admin → Plugins →
+Deactivate → Activate on Shopping Intellect to run it (this also runs the 300-row seed step,
+which may take a few seconds longer than prior migrations), then confirm via Tools → SI Schema
+Status that `schema_version` is `7`. Owner verification on shopping.flux.bg of this slice's
+acceptance criteria (a fresh account's Add/Search shows seeded terms like "Домати",
+"Краставици", "Шампоан", "Кафе на зърна" without ever typing them; favoriting a seeded term still
+works) is outstanding until that migration step runs.**
 
 **2026-06-17 production incident — sync pipeline, four stacked bugs.** Every list/item was stuck
 `sync-pending` forever. Root-caused and fixed live (outside the normal Slice flow, by explicit

@@ -132,6 +132,7 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 | §4.0c | Manual StoreProduct creation (specific item path, `list_items.store_product_id`) | ✅ done |
 | §4.0c-fix | "Добави конкретен артикул" button no longer hidden on term match | ✅ done |
 | §4.0e | Unlimited-depth categories, many-to-many product↔category, seeded ~300 default products | ✅ done — **migration not yet run on prod, see note below** |
+| §4.0f | StoreProduct dedupe across users + async Gemini metadata extraction | ✅ done — **migration not yet run on prod, see note below** |
 
 **App (`app/`):** Vite + React PWA, FTP deploy wired. Implemented so far:
 - `AuthScreen` — register/login screen, working against the plugin's auth endpoints
@@ -400,8 +401,8 @@ plugin's `main` branch FTP-deploys.
 
 **Build order (2026-06-19, revised — added §4.0c-fix):** §3.1 (done) → §4.0 (done) → §2.3a (done) → §2.3b (done) → §2.3c (done)
 → §2.2d (done) → §2.3d (done) → §4.0b (done) → §2.6 (done) → §2.7 (done) → §4.0c (done) →
-§4.0c-fix (done) → §4.0e (done) →
-**§4.0f (next) → §2.8 → §4.0d → §2.9** →
+§4.0c-fix (done) → §4.0e (done) → §4.0f (done) →
+**§2.8 (next) → §4.0d → §2.9** →
 §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 (Family) → §2.5 (Favorites) → M5.
 **2026-06-18/19 re-sequencing:** the Owner asked for list management (delete/rename), item/
 product detail management, Catalog product management, and a Profile screen to be fully
@@ -682,6 +683,76 @@ Status that `schema_version` is `7`. Owner verification on shopping.flux.bg of t
 acceptance criteria (a fresh account's Add/Search shows seeded terms like "Домати",
 "Краставици", "Шампоан", "Кафе на зърна" without ever typing them; favoriting a seeded term still
 works) is outstanding until that migration step runs.**
+
+**§4.0f is done (2026-06-19).** StoreProduct dedupe across users + async Gemini metadata
+extraction. **Built directly by Claude (not Codex), by explicit Owner instruction
+overriding the normal Claude-designs/Codex-implements split for this one slice** — see
+full implementation notes in `slices/13-4.0f-storeproduct-dedupe-gemini-metadata.md`.
+**Backend (plugin repo, pushed to `main`):** `StoreProductRepositoryInterface` gained
+`findByNormalizedName`, `findPendingMetadataExtraction(int $limit)`,
+`updateMetadata(int, ?string, ?string, ?string, DateTimeImmutable)`, `attachCategory(int,
+int)`; `WpdbStoreProductRepository` implements all four.
+`StoreProductService::findOrCreate` now looks up an existing `source='user'` row by
+**exact `normalized_name` match across all users** (no owner/created-by filter) before
+inserting — two different accounts typing the same specific item now share one row;
+first writer wins, no merge logic, no fuzzy matching, no confirmation dialog. New
+migration `AddStoreProductMetadataExtractionMigration` (id `8`) adds
+`store_products.size_text`/`variant_text`/`metadata_extracted_at` (all nullable;
+`brand_normalized` already existed). `Models/StoreProduct` gained the three new fields
+as **trailing optional constructor params** (default `null`) so every existing
+positional `new StoreProduct(...)` call site across the test suite needed no changes.
+New `HttpClientInterface::post()` (mirrors `get()`'s `is_wp_error`/status/body handling
+in `WpHttpClient`, deliberately skips `get()`'s blocked-status/challenge-page detection
+— Gemini doesn't need it). New `Models/GeminiExtractionResult` (brand/size/variant/
+category, all nullable) + `Services/GeminiMetadataExtractor::extract()` (calls Gemini's
+`generateContent` REST endpoint, strips a possible ` ```json ` fence, parses the JSON;
+any HTTP failure, non-2xx, or unparseable response returns an all-null DTO rather than
+throwing — this runs in a background job, a bad response should never crash it). New
+`Services/StoreProductMetadataService::processPending(int $limit = 20)`: pulls pending
+rows oldest-first via `findPendingMetadataExtraction`, calls the extractor, writes via
+`updateMetadata`, and on a non-null extracted category does a case-insensitive name/slug
+match against `CategoryRepositoryInterface::listAll()` — attaches via `attachCategory` on
+a match, silently skips on no match (never blocks on a bad guess). New
+`bin/extract-metadata.php`, mirroring `bin/crawl.php`'s exact bootstrap shape (same
+wp-load.php probe, same autoloader registration), calls `processPending()` once and
+exits — **not** wired to `wp_schedule_event`, matching how `bin/crawl.php` is already
+operated (real server crontab, not WP-Cron). `ConfigInterface`/`Config` gained
+`geminiApiKey()`/`geminiModel()` (`get_option('si_gemini_api_key', '')`/
+`get_option('si_gemini_model', 'gemini-1.5-flash')`), mirroring
+`googleClientId()`/`googleClientSecret()` exactly. New `Admin/GeminiSettingsPage.php`, a
+near-exact copy of `GoogleSettingsPage.php` (Settings → SI Gemini API, API key as a
+password input, model as a text input defaulting to `gemini-1.5-flash`), wired into
+`Plugin.php` exactly where `GoogleSettingsPage` is wired. The PHPUnit `SqliteWpdb` test
+stub gained the three new nullable `store_products` columns, and got a real bug fixed in
+its `prepare()` reimplementation: `WpdbNullSafe::bind()`'s pattern of pre-quoting a
+nullable string and interpolating the already-quoted SQL literal into an outer
+`$wpdb->prepare()` call works in real WordPress (core `prepare()` escapes literal `%`
+before its own `vsprintf`), but the stub's naive `vsprintf` reimplementation didn't
+replicate that escaping — a value containing a literal `%` (e.g. `variant_text = "2%"`)
+crashed `vsprintf` with "Unknown format specifier". **Fixed in the test stub only**, not
+production code — this was a test-double gap (every other `WpdbNullSafe::bind()` call
+site had simply never been exercised with a literal `%` in its value before), not a real
+production bug. New tests: `StoreProductServiceTest` (cross-user dedupe returns the same
+id; different wording still creates a separate row), `WpdbStoreProductRepositoryTest`
+(`findByNormalizedName` round-trip; `findPendingMetadataExtraction` oldest-first + limit
++ excludes already-extracted rows; `updateMetadata` field+timestamp write;
+`attachCategory` junction-table round-trip), `GeminiMetadataExtractorTest` (well-formed
+parse, markdown-fenced parse, malformed-JSON-returns-nulls, non-2xx-returns-nulls,
+client-throws-returns-nulls), `StoreProductMetadataServiceTest` (writes extracted fields
++ attaches a matching category; skips attachment gracefully on no category match;
+returns 0 when nothing is pending). All 137 PHPUnit tests pass (was 122). **This slice
+adds migration id `8`** — after deploy, go to wp-admin → Plugins → Deactivate → Activate
+on Shopping Intellect, then confirm via Tools → SI Schema Status that `schema_version` is
+`8`. **Flags for the Owner:** (1) a real Gemini API key + model must be set in wp-admin →
+Settings → SI Gemini API before extraction does anything beyond writing nulls; (2)
+`bin/extract-metadata.php` needs a real crontab entry on the server — this is a new
+operational dependency, and there is no existing documented crontab entry for
+`bin/crawl.php` either (checked `09-risks-costs.md` and this file — neither records one),
+so there's no precedent line to copy; whoever has server access needs to add crontab
+entries for both scripts. Owner verification on shopping.flux.bg of this slice's
+acceptance criteria (cross-user dedupe via DB query; manual item add stays instant; the
+new settings page persists a saved key/model; a real Gemini key + a cron run populates
+extracted fields) is outstanding.
 
 **2026-06-17 production incident — sync pipeline, four stacked bugs.** Every list/item was stuck
 `sync-pending` forever. Root-caused and fixed live (outside the normal Slice flow, by explicit

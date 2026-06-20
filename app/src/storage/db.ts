@@ -368,7 +368,9 @@ export const mergeServerListItem = async (
     id: string;
     list_id: string;
     user_product_id: string | null;
+    user_product_client_uuid?: string | null;
     store_product_id?: string | null;
+    store_product_client_uuid?: string | null;
     quantity: number;
     unit: string;
     is_checked: boolean;
@@ -389,12 +391,12 @@ export const mergeServerListItem = async (
     return;
   }
 
-  if (serverItem.term && serverItem.user_product_id) {
-    const existingProduct = await db.get('user_products', serverItem.user_product_id);
+  if (serverItem.term && serverItem.user_product_client_uuid) {
+    const existingProduct = await db.get('user_products', serverItem.user_product_client_uuid);
     if (!existingProduct) {
       await db.put('user_products', {
-        client_uuid: serverItem.user_product_id,
-        id: serverItem.user_product_id,
+        client_uuid: serverItem.user_product_client_uuid,
+        id: serverItem.user_product_id ?? undefined,
         owner_type: 'user',
         owner_id: 0,
         term: serverItem.term,
@@ -404,12 +406,12 @@ export const mergeServerListItem = async (
     }
   }
 
-  if (serverItem.name && serverItem.store_product_id) {
-    const existingProduct = await db.get('store_products', serverItem.store_product_id);
+  if (serverItem.name && serverItem.store_product_client_uuid) {
+    const existingProduct = await db.get('store_products', serverItem.store_product_client_uuid);
     if (!existingProduct) {
       await db.put('store_products', {
-        client_uuid: serverItem.store_product_id,
-        id: serverItem.store_product_id,
+        client_uuid: serverItem.store_product_client_uuid,
+        id: serverItem.store_product_id ?? undefined,
         source: 'user',
         name: serverItem.name,
         created_at: serverItem.updated_at
@@ -422,9 +424,9 @@ export const mergeServerListItem = async (
     id: serverItem.id,
     list_client_uuid: listClientUuid,
     list_id: serverItem.list_id,
-    user_product_client_uuid: serverItem.user_product_id ?? undefined,
+    user_product_client_uuid: serverItem.user_product_client_uuid ?? undefined,
     user_product_id: serverItem.user_product_id ?? undefined,
-    store_product_client_uuid: serverItem.store_product_id ?? undefined,
+    store_product_client_uuid: serverItem.store_product_client_uuid ?? undefined,
     store_product_id: serverItem.store_product_id ?? undefined,
     quantity: serverItem.quantity,
     unit: serverItem.unit,

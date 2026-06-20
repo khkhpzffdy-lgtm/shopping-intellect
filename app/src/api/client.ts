@@ -93,12 +93,16 @@ export type ServerListItemDto = {
   id: string;
   client_uuid: string;
   list_id: string;
-  user_product_id: string;
+  user_product_id: string | null;
+  user_product_client_uuid?: string | null;
+  store_product_id?: string | null;
+  store_product_client_uuid?: string | null;
   quantity: number;
   unit: string;
   is_checked: boolean;
   updated_at: string;
   term: string | null;
+  name?: string | null;
 };
 
 export const fetchLists = () =>

@@ -7,6 +7,7 @@ import {
   getListItems,
   getMutationStatusCounts,
   getStoreProductByClientUuid,
+  mergeServerListItem,
   putList,
   putListItem,
   putStoreProduct
@@ -121,4 +122,69 @@ test('getListItems resolves the name of a store-product-targeted item', async ()
   const items = await getListItems('list-y');
 
   expect(items[0]?.term).toBe('Мляко Данон 2% 1л');
+});
+
+test('mergeServerListItem keys store_products by client_uuid, not the server numeric id', async () => {
+  // Regression guard for a real production bug (2026-06-20): mergeServerListItem
+  // used to db.put/db.get store_products keyed by the server's numeric
+  // store_product_id instead of its real client_uuid. Since the IndexedDB
+  // store_products object store's keyPath is client_uuid, two *different*
+  // StoreProducts that happen to share the same numeric server id (e.g. two
+  // different users' first manually-added item, both id=10) would collide and
+  // silently overwrite each other locally — showing one user's item under the
+  // other's name on the next merge.
+  await putList({
+    client_uuid: 'list-z',
+    id: '7',
+    name: 'Z',
+    owner_type: 'user',
+    owner_id: 1,
+    updated_at: '2026-06-20T00:00:00.000Z'
+  });
+
+  await mergeServerListItem(
+    {
+      id: '50',
+      client_uuid: 'item-z1',
+      list_id: '7',
+      user_product_id: null,
+      store_product_id: '10',
+      store_product_client_uuid: 'sp-real-uuid-1',
+      quantity: 1,
+      unit: 'piece',
+      is_checked: false,
+      updated_at: '2026-06-20T00:00:00.000Z',
+      term: null,
+      name: 'Мляко Олимпус 2% 1л'
+    },
+    'list-z'
+  );
+
+  await mergeServerListItem(
+    {
+      id: '51',
+      client_uuid: 'item-z2',
+      list_id: '7',
+      user_product_id: null,
+      store_product_id: '10',
+      store_product_client_uuid: 'sp-real-uuid-2',
+      quantity: 1,
+      unit: 'piece',
+      is_checked: false,
+      updated_at: '2026-06-20T00:00:01.000Z',
+      term: null,
+      name: 'Dream'
+    },
+    'list-z'
+  );
+
+  const items = await getListItems('list-z');
+  const firstItem = items.find((item) => item.client_uuid === 'item-z1');
+  const secondItem = items.find((item) => item.client_uuid === 'item-z2');
+
+  expect(firstItem?.term).toBe('Мляко Олимпус 2% 1л');
+  expect(secondItem?.term).toBe('Dream');
+
+  expect(await getStoreProductByClientUuid('sp-real-uuid-1')).toBeTruthy();
+  expect(await getStoreProductByClientUuid('sp-real-uuid-2')).toBeTruthy();
 });

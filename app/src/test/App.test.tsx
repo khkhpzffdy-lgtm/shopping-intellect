@@ -640,6 +640,7 @@ test('opening a list pulls its items from the server when local IndexedDB has no
                 client_uuid: 'server-item-uuid-1',
                 list_id: '902',
                 user_product_id: 'up-700',
+                user_product_client_uuid: 'up-uuid-700',
                 quantity: 3,
                 unit: 'бр.',
                 is_checked: false,

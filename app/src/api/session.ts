@@ -22,20 +22,27 @@ const decodeTokenUser = (token: string): SessionUser | null => {
       return null;
     }
 
+    // Real claim names from JwtService::issue() are 'sub'/'fids', not
+    // 'user_id'/'family_ids' — this previously always returned null for a
+    // real token (silently, no error), leaving session.user permanently
+    // null after every cookie-based refresh restore. display_name is never
+    // actually a JWT claim (the issuer doesn't put it there); it's kept as
+    // an optional fallback in case that ever changes, but in practice this
+    // always falls through to 'Member' on a refresh-restored session.
     const claims = JSON.parse(decodeBase64Url(payload)) as {
-      user_id?: number | string;
-      family_ids?: Array<number | string>;
+      sub?: number | string;
+      fids?: Array<number | string>;
       display_name?: string;
     };
 
-    if (!claims.user_id) {
+    if (!claims.sub) {
       return null;
     }
 
     return {
-      id: Number(claims.user_id),
+      id: Number(claims.sub),
       displayName: claims.display_name ?? 'Member',
-      familyIds: (claims.family_ids ?? []).map((familyId) => Number(familyId))
+      familyIds: (claims.fids ?? []).map((familyId) => Number(familyId))
     };
   } catch {
     return null;

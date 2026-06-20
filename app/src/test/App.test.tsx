@@ -26,8 +26,20 @@ const renderApp = () => {
 
 const mockFetch = vi.fn<typeof fetch>();
 
-const makeToken = (payload: Record<string, unknown>) => {
-  const base64 = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+// Real JwtService::issue() claims are 'sub'/'fids', not 'user_id'/'family_ids'
+// (decodeTokenUser() in session.ts was fixed to match this session — see that
+// file's comment for the full story). Every call site here still passes
+// user_id/family_ids for readability; this maps them to the real claim names
+// so a token-only session restore (no explicit `user` override) decodes
+// correctly, the same way it now does against a real backend token.
+const makeToken = (payload: Record<string, unknown> & { user_id?: number; family_ids?: number[] }) => {
+  const { user_id, family_ids, ...rest } = payload;
+  const claims = {
+    ...rest,
+    ...(user_id !== undefined ? { sub: user_id } : {}),
+    ...(family_ids !== undefined ? { fids: family_ids } : {})
+  };
+  const base64 = btoa(JSON.stringify(claims)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   return `header.${base64}.signature`;
 };
 

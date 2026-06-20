@@ -13,6 +13,8 @@ import {
   getListItemCounts,
   getLists,
   getMutationStatusCounts,
+  getQueuedMutations,
+  getUserProduct,
   getUserProductByTerm,
   markMutationInFlight,
   mergeServerList,
@@ -24,11 +26,13 @@ import {
   touchListUpdatedAt,
   updateMutationBody,
   type ListItemView,
-  type ShoppingListRecord
+  type ShoppingListRecord,
+  type UserProductRecord
 } from '../storage/db';
 import { AddSearchScreen } from './AddSearchScreen';
 import { ListsScreen } from './ListsScreen';
 import { ListScreen } from './ListScreen';
+import { UserProductDetailScreen } from './UserProductDetailScreen';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { generateUuid } from '../utils/uuid';
 
@@ -67,6 +71,8 @@ export const HomeScreen = () => {
   const [draft, setDraft] = useState({ term: '', quantity: '', unit: '' });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [addSearchOpen, setAddSearchOpen] = useState(false);
+  const [itemDetailKey, setItemDetailKey] = useState<string | null>(null);
+  const [detailUserProduct, setDetailUserProduct] = useState<UserProductRecord | null>(null);
   const selectedListKeyRef = useRef<string | null>(null);
 
   selectedListKeyRef.current = selectedListKey;
@@ -74,6 +80,11 @@ export const HomeScreen = () => {
   const selectedList = useMemo(
     () => lists.find((list) => list.client_uuid === selectedListKey || list.id === selectedListKey) ?? null,
     [lists, selectedListKey]
+  );
+
+  const itemDetailItem = useMemo(
+    () => items.find((candidate) => candidate.client_uuid === itemDetailKey) ?? null,
+    [items, itemDetailKey]
   );
 
   const refreshMutationStatusCounts = async () => {
@@ -327,14 +338,17 @@ export const HomeScreen = () => {
     }
   };
 
-  const handleToggleChecked = async (item: ListItemView) => {
+  const handleUpdateItem = async (
+    item: ListItemView,
+    patch: { is_checked?: boolean; quantity?: number; unit?: string }
+  ) => {
     if (!selectedList) {
       return;
     }
 
     const updatedItem = {
       ...item,
-      is_checked: !item.is_checked,
+      ...patch,
       updated_at: new Date().toISOString()
     };
 
@@ -361,7 +375,7 @@ export const HomeScreen = () => {
       client_uuid: mutationUuid,
       endpoint: `/lists/${selectedList.id}/items/${item.id}`,
       method: 'PATCH',
-      body: { is_checked: updatedItem.is_checked },
+      body: patch,
       created_at: updatedItem.updated_at,
       attempts: 0,
       status: 'pending',
@@ -375,6 +389,141 @@ export const HomeScreen = () => {
         await sendMutation(claimedMutation);
       }
       await refreshItems(selectedList.client_uuid);
+    } catch {
+      // Keep local optimistic state and the pending mutation.
+    }
+  };
+
+  const handleToggleChecked = (item: ListItemView) => handleUpdateItem(item, { is_checked: !item.is_checked });
+
+  const handleOpenItemDetail = async (item: ListItemView) => {
+    if (!item.user_product_client_uuid) {
+      return;
+    }
+
+    const userProduct = await getUserProduct(item.user_product_client_uuid);
+    if (!userProduct) {
+      return;
+    }
+
+    setItemDetailKey(item.client_uuid);
+    setDetailUserProduct(userProduct);
+  };
+
+  const handleCloseItemDetail = () => {
+    setItemDetailKey(null);
+    setDetailUserProduct(null);
+  };
+
+  // A new term added inline at list-write time has no `user_products` create
+  // mutation of its own — it rides along as the nested `user_product` field
+  // on the list item's CREATE mutation (see ListService::createItem()). If
+  // we're renaming before that create has synced, the rename must land in
+  // that nested field rather than racing a PATCH against an id that doesn't
+  // exist yet.
+  const findPendingUserProductCreateMutation = async (userProductClientUuid: string) => {
+    const queued = await getQueuedMutations(['pending', 'in_flight', 'failed']);
+    return (
+      queued.find((mutation) => {
+        const body = mutation.body as { user_product?: { client_uuid?: string } } | undefined;
+        return body?.user_product?.client_uuid === userProductClientUuid;
+      }) ?? null
+    );
+  };
+
+  const handleRenameUserProduct = async (
+    userProduct: UserProductRecord,
+    newTerm: string
+  ): Promise<{ ok: boolean; error?: string }> => {
+    const trimmed = newTerm.trim();
+    if (!trimmed || trimmed === userProduct.term) {
+      return { ok: true };
+    }
+
+    const previous = userProduct;
+    const updated: UserProductRecord = {
+      ...userProduct,
+      term: trimmed,
+      normalized_term: trimmed.toLocaleLowerCase('bg-BG')
+    };
+
+    await putUserProduct(updated);
+    setDetailUserProduct(updated);
+
+    if (!userProduct.id) {
+      const pending = await findPendingUserProductCreateMutation(userProduct.client_uuid);
+      if (pending) {
+        const body = pending.body as { user_product?: Record<string, unknown> };
+        await updateMutationBody(pending.client_uuid, {
+          ...body,
+          user_product: { ...body.user_product, term: trimmed }
+        });
+      }
+      return { ok: true };
+    }
+
+    const mutationUuid = generateUuid();
+    await enqueueMutation({
+      client_uuid: mutationUuid,
+      endpoint: `/user-products/${userProduct.id}`,
+      method: 'PATCH',
+      body: { term: trimmed },
+      created_at: new Date().toISOString(),
+      attempts: 0,
+      status: 'pending',
+      entity_client_uuid: userProduct.client_uuid
+    });
+
+    try {
+      const claimedMutation = await markMutationInFlight(mutationUuid);
+      if (claimedMutation) {
+        await sendMutation(claimedMutation);
+      }
+      return { ok: true };
+    } catch (error) {
+      if (error instanceof ApiError && (error.status === 409 || error.status === 403)) {
+        // A real rejection, not a connectivity problem — revert the
+        // optimistic rename and drop the mutation so it doesn't keep
+        // retrying a request the server will never accept.
+        await putUserProduct(previous);
+        setDetailUserProduct(previous);
+        await removeQueuedMutationsForEntity(userProduct.client_uuid);
+        return {
+          ok: false,
+          error: error.status === 409 ? 'Вече има термин с това име.' : 'Този термин не може да се преименува.'
+        };
+      }
+      // Offline / network failure — keep the optimistic rename and the queued mutation.
+      return { ok: true };
+    }
+  };
+
+  const handleSetFavorite = async (userProduct: UserProductRecord, isFavorite: boolean) => {
+    if (userProduct.owner_type === 'system') {
+      return;
+    }
+
+    const updated: UserProductRecord = { ...userProduct, is_favorite: isFavorite };
+    await putUserProduct(updated);
+    setDetailUserProduct(updated);
+
+    const mutationUuid = generateUuid();
+    await enqueueMutation({
+      client_uuid: mutationUuid,
+      endpoint: `/user-products/${userProduct.id ?? userProduct.client_uuid}`,
+      method: 'PATCH',
+      body: { is_favorite: isFavorite },
+      created_at: new Date().toISOString(),
+      attempts: 0,
+      status: 'pending',
+      entity_client_uuid: userProduct.client_uuid
+    });
+
+    try {
+      const claimedMutation = await markMutationInFlight(mutationUuid);
+      if (claimedMutation) {
+        await sendMutation(claimedMutation);
+      }
     } catch {
       // Keep local optimistic state and the pending mutation.
     }
@@ -511,6 +660,7 @@ export const HomeScreen = () => {
             onBack={() => setSelectedListKey(null)}
             onAddItem={handleAddItem}
             onOpenAddSearch={() => setAddSearchOpen(true)}
+            onOpenItemDetail={handleOpenItemDetail}
             onToggleChecked={handleToggleChecked}
             onRemoveItem={handleRemoveItem}
             onRenameList={(name) => handleRenameList(selectedList.client_uuid, name)}
@@ -564,6 +714,40 @@ export const HomeScreen = () => {
                 void refreshItems(selectedList.client_uuid);
               }}
               isActive={addSearchOpen}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {selectedList && itemDetailItem && detailUserProduct ? (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'var(--bg)',
+            zIndex: 50,
+            overflowY: 'auto'
+          }}
+          className="px-4 py-6 md:px-8"
+        >
+          <div className="mx-auto max-w-3xl space-y-4">
+            <div className="appbar">
+              <button
+                type="button"
+                onClick={handleCloseItemDetail}
+                className="iconbtn"
+                aria-label="Затвори"
+              >
+                ←
+              </button>
+              <div className="appbar__title">{detailUserProduct.term}</div>
+            </div>
+            <UserProductDetailScreen
+              item={itemDetailItem}
+              userProduct={detailUserProduct}
+              onRename={(newTerm) => handleRenameUserProduct(detailUserProduct, newTerm)}
+              onSetFavorite={(isFavorite) => handleSetFavorite(detailUserProduct, isFavorite)}
+              onUpdateItem={(patch) => handleUpdateItem(itemDetailItem, patch)}
             />
           </div>
         </div>

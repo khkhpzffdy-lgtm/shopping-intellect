@@ -21,6 +21,7 @@ export type UserProductRecord = {
   created_at: string;
   category_ids?: string[];
   is_global_default?: boolean;
+  is_favorite?: boolean;
 };
 
 export type StoreProductRecord = {

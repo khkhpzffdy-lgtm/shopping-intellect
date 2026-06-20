@@ -422,9 +422,9 @@ test('mode toggle switches between planning and shopping rendering', async () =>
   await userEvent.type(screen.getByLabelText('Item term'), 'ябълки');
   await userEvent.click(screen.getByRole('button', { name: 'Add item' }));
 
-  expect(await screen.findByText('Expand details soon')).toBeInTheDocument();
+  expect(await screen.findByTestId(/item-detail-trigger-/)).toBeInTheDocument();
   await userEvent.click(screen.getByRole('button', { name: 'shopping' }));
-  expect(screen.queryByText('Expand details soon')).not.toBeInTheDocument();
+  expect(screen.queryByTestId(/item-detail-trigger-/)).not.toBeInTheDocument();
   expect(await screen.findByRole('button', { name: /ябълки/i })).toBeInTheDocument();
 });
 

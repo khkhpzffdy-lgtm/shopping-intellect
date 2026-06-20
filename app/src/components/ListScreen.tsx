@@ -17,6 +17,7 @@ type ListScreenProps = {
   onBack: () => void;
   onAddItem: () => void;
   onOpenAddSearch: () => void;
+  onOpenItemDetail: (item: ListItemView) => void;
   onToggleChecked: (item: ListItemView) => void;
   onRemoveItem: (item: ListItemView) => void;
   onRenameList: (name: string) => void;
@@ -34,6 +35,7 @@ export const ListScreen = ({
   onBack,
   onAddItem,
   onOpenAddSearch,
+  onOpenItemDetail,
   onToggleChecked,
   onRemoveItem,
   onRenameList
@@ -127,13 +129,27 @@ export const ListScreen = ({
           mode === 'planning' ? (
             <article key={item.client_uuid} data-testid={`list-item-${item.client_uuid}`} className="git">
               <span className="git__emoji">{ITEM_EMOJI}</span>
-              <div className="git__main">
-                <div className="git__name">{item.term}</div>
-                <div className="git__sub">
-                  {item.quantity} {item.unit}
+              {item.user_product_client_uuid ? (
+                <button
+                  type="button"
+                  className="git__main"
+                  style={{ background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', padding: 0 }}
+                  onClick={() => onOpenItemDetail(item)}
+                  data-testid={`item-detail-trigger-${item.client_uuid}`}
+                >
+                  <div className="git__name">{item.term}</div>
+                  <div className="git__sub">
+                    {item.quantity} {item.unit}
+                  </div>
+                </button>
+              ) : (
+                <div className="git__main">
+                  <div className="git__name">{item.term}</div>
+                  <div className="git__sub">
+                    {item.quantity} {item.unit}
+                  </div>
                 </div>
-                <p style={{ color: 'var(--ink-3)', fontSize: 'var(--fs-xs)', marginTop: '4px' }}>Expand details soon</p>
-              </div>
+              )}
               <SyncStatusIndicator
                 pending={mutationStatusCounts[item.client_uuid]?.pending ?? 0}
                 failed={mutationStatusCounts[item.client_uuid]?.failed ?? 0}

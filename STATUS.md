@@ -133,6 +133,7 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 | §4.0c-fix | "Добави конкретен артикул" button no longer hidden on term match | ✅ done |
 | §4.0e | Unlimited-depth categories, many-to-many product↔category, seeded ~300 default products | ✅ done — **migration not yet run on prod, see note below** |
 | §4.0f | StoreProduct dedupe across users + async Gemini metadata extraction | ✅ done — **migration not yet run on prod, see note below** |
+| §2.8a | UserProduct detail screen (rename + favorite + qty/unit edits), replaces the "Expand details soon" placeholder for UserProduct-backed list rows | ✅ done — **§2.8b (StoreProduct detail) still open, see note below** |
 
 **App (`app/`):** Vite + React PWA, FTP deploy wired. Implemented so far:
 - `AuthScreen` — register/login screen, working against the plugin's auth endpoints
@@ -401,8 +402,8 @@ plugin's `main` branch FTP-deploys.
 
 **Build order (2026-06-19, revised — added §4.0c-fix):** §3.1 (done) → §4.0 (done) → §2.3a (done) → §2.3b (done) → §2.3c (done)
 → §2.2d (done) → §2.3d (done) → §4.0b (done) → §2.6 (done) → §2.7 (done) → §4.0c (done) →
-§4.0c-fix (done) → §4.0e (done) → §4.0f (done) →
-**§2.8 (next) → §4.0d → §2.9** →
+§4.0c-fix (done) → §4.0e (done) → §4.0f (done) → §2.8a (done) →
+**§2.8b (next) → §4.0d → §2.9** →
 §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 (Family) → §2.5 (Favorites) → M5.
 **2026-06-18/19 re-sequencing:** the Owner asked for list management (delete/rename), item/
 product detail management, Catalog product management, and a Profile screen to be fully
@@ -812,6 +813,49 @@ tests (admin-page rendering wired to live WP functions, consistent with
 this class's logic is exercised by the already-tested `GeminiMetadataExtractor` it calls
 into). All 139 PHPUnit tests still pass (unchanged count — no new testable logic, just
 wiring). Pushed to `main`. **No new migration.**
+
+**§2.8a is done (2026-06-20).** UserProduct detail screen — rename, favorite, and
+quantity/unit editing, replacing `ListScreen`'s "Expand details soon" placeholder for any
+list row backed by a `user_product_id`/`user_product_client_uuid` (StoreProduct-backed
+rows are still untouched — that's `§2.8b`, not built yet). **Backend:**
+`UserProductService::rename()`/`setFavorite()` (`src/Services/UserProductService.php`) —
+both share a private `ownedNonSystemUserProduct()` guard mirroring `archive()`'s existing
+system-row/ownership check. `rename()` re-runs `TermNormalizer`, rejects a collision with
+another existing row for the same owner via `DuplicateUserProductTermException` (409, no
+merge semantics — rejected outright per the iron rule on dedupe). New
+`PATCH /user-products/{id}` route (`UserProductController::handlePatch()`) accepts
+`term` and/or `is_favorite`, 400 if neither given, 403 on a system row, 409 on a
+duplicate term. 157 PHPUnit tests pass (11 new ones from this slice). **Frontend:** new
+`UserProductDetailScreen.tsx` (term input + Save, favorite ♥/♡ toggle disabled for
+`owner_type === 'system'`, read-only category badges via the existing public
+`GET /categories`, quantity/unit inputs committed on blur) opened from `ListScreen`'s
+planning-mode item row (now a `<button>` instead of static text, only when
+`user_product_client_uuid` is set). `HomeScreen.tsx` generalized `handleToggleChecked`
+into `handleUpdateItem(item, patch)` (carries `is_checked`/`quantity`/`unit`, same
+optimistic-local → enqueue → `markMutationInFlight` + `sendMutation` shape as before) and
+added `handleRenameUserProduct`/`handleSetFavorite`. Offline-safety nuance: a rename on a
+UserProduct with no server `id` yet (still riding the list item's create-on-write inline
+payload) merges into that pending CREATE mutation's nested `user_product.term` via
+`updateMutationBody` rather than enqueueing a second PATCH; a rename that gets a same-session
+403/409 back reverts the optimistic local write and drops the now-permanently-failing
+mutation (shown inline, not just as a generic failed-sync badge) — but a queued rename that
+fails later while offline still gets surfaced only via `SyncStatusIndicator`, not retroactively
+inline. `is_favorite` added to `UserProductRecord` (`storage/db.ts`); `sendMutation.ts`'s
+`resolveEndpoint` gained a `/user-products/{clientUuid}` → real-id resolution branch
+(mirrors the existing `/lists/{clientUuid}` one). New test file
+`src/test/userProductDetail.test.tsx` (6 tests). `npm run build` and `tsc -b` pass.
+**Known gap, not fixed in this slice:** `mergeServerListItem` (`storage/db.ts`) hardcodes
+`owner_type: 'user'` when first creating a local `user_products` row from a synced list
+item, because `ListController::itemData()` doesn't return the UserProduct's real
+`owner_type`/`is_favorite`/`category_ids` — so immediately after a hard sync (before
+`AddSearchScreen` has ever run its own `GET /user-products` fetch in that session), the
+detail screen's "hide favorite/edit on a system row" check could see the wrong
+`owner_type` for a seeded term. Flagging this for `decisions.md` rather than fixing it
+here — fixing it properly means widening `itemData()`'s response shape, a separate,
+slightly bigger change. **Verification note:** browser automation (chromium-cli/Playwright)
+isn't installed in this sandbox, so this slice was verified via PHPUnit + Vitest/jsdom
+(real DOM render/click/blur) + `tsc`/`vite build`, not an actual rendered-browser
+screenshot — Owner should still eyeball the real flow on `shopping.flux.bg` per usual.
 
 **2026-06-17 production incident — sync pipeline, four stacked bugs.** Every list/item was stuck
 `sync-pending` forever. Root-caused and fixed live (outside the normal Slice flow, by explicit

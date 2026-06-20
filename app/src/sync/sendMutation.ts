@@ -1,5 +1,5 @@
 import { apiRequest } from '../api/client';
-import { getList, markMutationDone, markMutationFailed, type MutationQueueRecord } from '../storage/db';
+import { getList, getUserProduct, markMutationDone, markMutationFailed, type MutationQueueRecord } from '../storage/db';
 import { applyMutationSuccess } from './applyMutationSuccess';
 
 export const resolveEndpoint = async (mutation: MutationQueueRecord) => {
@@ -19,16 +19,16 @@ export const resolveEndpoint = async (mutation: MutationQueueRecord) => {
 
   if (mutation.method === 'DELETE' || mutation.method === 'PATCH') {
     const listMatch = mutation.endpoint.match(/^\/lists\/([^/]+)$/);
-    if (!listMatch) {
-      return mutation.endpoint;
+    if (listMatch) {
+      const list = await getList(listMatch[1]);
+      return list?.id ? `/lists/${list.id}` : mutation.endpoint;
     }
 
-    const list = await getList(listMatch[1]);
-    if (!list?.id) {
-      return mutation.endpoint;
+    const userProductMatch = mutation.endpoint.match(/^\/user-products\/([^/]+)$/);
+    if (userProductMatch) {
+      const userProduct = await getUserProduct(userProductMatch[1]);
+      return userProduct?.id ? `/user-products/${userProduct.id}` : mutation.endpoint;
     }
-
-    return `/lists/${list.id}`;
   }
 
   return mutation.endpoint;

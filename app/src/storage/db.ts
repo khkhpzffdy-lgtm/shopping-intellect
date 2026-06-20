@@ -388,7 +388,13 @@ export const mergeServerList = async (serverList: {
   const db = await getDb();
   const local = await db.get('lists', serverList.client_uuid);
 
-  if (local && local.updated_at >= serverList.updated_at) {
+  // Strictly `>`, not `>=`. An equal timestamp means the *data* hasn't
+  // changed since last sync, but the API *response shape* can still have
+  // gained a field since then without bumping `updated_at` (real example,
+  // 2026-06-20: itemData() started returning client_uuid for an existing,
+  // untouched item). `>=` would skip forever and freeze that row at its old,
+  // incomplete shape — `>` lets an equal-timestamp response still re-apply.
+  if (local && local.updated_at > serverList.updated_at) {
     return;
   }
 
@@ -427,7 +433,14 @@ export const mergeServerListItem = async (
   const db = await getDb();
   const local = await db.get('list_items', serverItem.client_uuid);
 
-  if (local && local.updated_at >= serverItem.updated_at) {
+  // Strictly `>`, not `>=` — see the matching comment in mergeServerList()
+  // above. This is the actual root cause of a real production symptom
+  // (2026-06-20): list items untouched since before itemData() started
+  // returning user_product_client_uuid stayed frozen without it forever,
+  // since their updated_at never changed — making their tile permanently
+  // look "not clickable" with no error, indistinguishable from a bug in the
+  // tap handler itself.
+  if (local && local.updated_at > serverItem.updated_at) {
     return;
   }
 

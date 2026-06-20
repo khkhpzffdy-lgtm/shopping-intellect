@@ -190,6 +190,64 @@ test('mergeServerListItem keys store_products by client_uuid, not the server num
   expect(await getStoreProductByClientUuid('sp-real-uuid-2')).toBeTruthy();
 });
 
+test('mergeServerListItem re-applies a same-timestamp server response that gained a field', async () => {
+  // Regression guard for a real production symptom (2026-06-20): a list
+  // item's tile went permanently unclickable with no error. Root cause —
+  // mergeServerListItem's freshness guard used to be `local.updated_at >=
+  // serverItem.updated_at` (skip on equal too). itemData() started returning
+  // user_product_client_uuid for items it previously didn't, without
+  // bumping their updated_at (the underlying data didn't change, only the
+  // response shape did) — so any item already cached locally from before
+  // that fix stayed frozen without the field on every subsequent hard sync,
+  // since its timestamp never moves past "equal". Loosening the guard to
+  // strict `>` lets an equal-timestamp response still re-apply.
+  await putList({
+    client_uuid: 'list-stale',
+    id: '8',
+    name: 'Stale',
+    owner_type: 'user',
+    owner_id: 1,
+    updated_at: '2026-06-20T00:00:00.000Z'
+  });
+
+  // Simulates a row cached before the backend started returning
+  // user_product_client_uuid — same client_uuid/updated_at as what the
+  // server will report below, but missing the field entirely.
+  await putListItem({
+    client_uuid: 'item-stale-1',
+    list_client_uuid: 'list-stale',
+    list_id: '8',
+    user_product_id: '20',
+    quantity: 1,
+    unit: 'piece',
+    is_checked: false,
+    created_at: '2026-06-20T00:00:00.000Z',
+    updated_at: '2026-06-20T00:00:00.000Z'
+  });
+
+  await mergeServerListItem(
+    {
+      id: '900',
+      client_uuid: 'item-stale-1',
+      list_id: '8',
+      user_product_id: '20',
+      user_product_client_uuid: 'up-stale-1',
+      store_product_id: null,
+      quantity: 1,
+      unit: 'piece',
+      is_checked: false,
+      updated_at: '2026-06-20T00:00:00.000Z',
+      term: 'мляко'
+    },
+    'list-stale'
+  );
+
+  const items = await getListItems('list-stale');
+  const item = items.find((candidate) => candidate.client_uuid === 'item-stale-1');
+
+  expect(item?.user_product_client_uuid).toBe('up-stale-1');
+});
+
 test('upgrading from DB_VERSION 2 deletes pre-existing rows with a corrupt numeric client_uuid', async () => {
   // Regression guard for the real-world fallout of the "Dream" bug: by the
   // time the keying fix (above test) shipped, phones that had already hit

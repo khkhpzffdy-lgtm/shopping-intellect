@@ -881,6 +881,34 @@ the resulting cache-miss-then-silent-failure symptom; if tiles still go unclicka
 after this deploys, that points at a different/additional cause and needs fresh
 Owner repro steps (which screens, in what order, online or offline at the time).
 
+**§2.8a fix #2 (2026-06-20): actual root cause found — `mergeServerListItem`'s
+freshness guard, not navigation order.** The Owner's follow-up report was more precise:
+it's positional within one list (everything above a given tile is stuck, everything
+below it works), not tied to "2-3 screens." That ruled out fix #1's hard-sync-timing
+theory and pointed at `storage/db.ts`'s `mergeServerList()`/`mergeServerListItem()`,
+both of which skip re-writing a row whenever `local.updated_at >= server.updated_at` —
+**including when they're equal**. Confirmed via `plugin/`'s own git history: commit
+`84cf0b7` ("Include client_uuid in itemData()'s user_product/store_product fields",
+2026-06-20 09:40) changed the *shape* of `GET /lists/{id}`'s response — adding
+`user_product_client_uuid` for items that previously didn't get it — **without**
+bumping those items' `updated_at` (the underlying data never changed, only the API
+contract did). Any item not touched since stays at `local.updated_at === server's
+updated_at` forever, so the `>=` guard skips its re-merge on every subsequent hard
+sync, permanently freezing it at its old, incomplete shape — exactly "everything
+synced before today's backend fix is stuck, everything synced after it works,"
+matching a positional split by creation order (`getListItems()` sorts by
+`created_at`). This is a **latent bug independent of `§2.8a`** — any future field
+added to a response without bumping `updated_at` would hit the same trap — `§2.8a`
+only made it *visible* by being the first thing to actually act on
+`user_product_client_uuid`'s presence. **Fix:** loosened both guards from `>=` to
+strict `>` (`db.ts`), so an equal-timestamp server response still re-applies instead of
+being skipped — safe, since it's then either a true no-op rewrite or it's picking up a
+newly-added field. **Verified, not assumed:** reverted just this one-line-pair via
+`git stash` and confirmed the new regression test
+(`db.test.ts` — `mergeServerListItem re-applies a same-timestamp server response that
+gained a field`) fails on the old `>=` guard and passes on `>`. This self-heals on the
+next hard sync after deploy — no migration needed, no manual data fix.
+
 **2026-06-17 production incident — sync pipeline, four stacked bugs.** Every list/item was stuck
 `sync-pending` forever. Root-caused and fixed live (outside the normal Slice flow, by explicit
 Owner direction, since it was actively breaking production):

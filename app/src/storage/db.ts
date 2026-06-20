@@ -65,7 +65,19 @@ export type ListItemView = ListItemRecord & {
 };
 
 const DB_NAME = 'si-db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
+
+// A real client_uuid is always a v4 UUID (hex + dashes). Before this version,
+// mergeServerListItem() keyed store_products/user_products by the server's
+// *numeric* id instead, so any row whose client_uuid is purely digits is a
+// corrupt leftover from that bug — two different items that happened to
+// share the same numeric server id would overwrite each other under that
+// fake key, showing one item's name on a completely different item's row.
+// There is no way to recover which real client_uuid such a row was, so the
+// only correct move on upgrade is to drop it; the next server-pull-on-boot
+// re-creates it correctly, this time keyed by its real client_uuid.
+const isCorruptNumericClientUuid = (clientUuid: unknown): boolean =>
+  typeof clientUuid === 'string' && /^\d+$/.test(clientUuid);
 
 const normalizeTerm = (term: string) => term.trim().toLocaleLowerCase('bg-BG');
 
@@ -73,7 +85,7 @@ let dbPromise: ReturnType<typeof openDB> | null = null;
 
 const getDb = () => {
   dbPromise ??= openDB(DB_NAME, DB_VERSION, {
-    upgrade(db) {
+    async upgrade(db, oldVersion, _newVersion, transaction) {
       if (!db.objectStoreNames.contains('lists')) {
         db.createObjectStore('lists', { keyPath: 'client_uuid' });
       }
@@ -88,6 +100,18 @@ const getDb = () => {
       }
       if (!db.objectStoreNames.contains('mutation_queue')) {
         db.createObjectStore('mutation_queue', { keyPath: 'client_uuid' });
+      }
+
+      if (oldVersion < 3) {
+        for (const storeName of ['user_products', 'store_products'] as const) {
+          const store = transaction.objectStore(storeName);
+          const rows = await store.getAll();
+          for (const row of rows) {
+            if (isCorruptNumericClientUuid(row.client_uuid)) {
+              await store.delete(row.client_uuid);
+            }
+          }
+        }
       }
     },
     blocking() {

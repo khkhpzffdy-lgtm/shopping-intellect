@@ -1,3 +1,4 @@
+import { openDB } from 'idb';
 import { beforeEach, expect, test } from 'vitest';
 import {
   clearDatabase,
@@ -187,4 +188,59 @@ test('mergeServerListItem keys store_products by client_uuid, not the server num
 
   expect(await getStoreProductByClientUuid('sp-real-uuid-1')).toBeTruthy();
   expect(await getStoreProductByClientUuid('sp-real-uuid-2')).toBeTruthy();
+});
+
+test('upgrading from DB_VERSION 2 deletes pre-existing rows with a corrupt numeric client_uuid', async () => {
+  // Regression guard for the real-world fallout of the "Dream" bug: by the
+  // time the keying fix (above test) shipped, phones that had already hit
+  // the bug were carrying a genuinely corrupt row on disk — a store_products
+  // row keyed by a server numeric id (e.g. "10") instead of a real UUID.
+  // Shipping the keying fix alone does NOT repair that pre-existing row; the
+  // DB_VERSION 3 upgrade step has to actively find and drop it so the next
+  // server-pull-on-boot can recreate it correctly under its real client_uuid.
+  await clearDatabase();
+
+  const legacyDb = await openDB('si-db', 2, {
+    upgrade(db) {
+      db.createObjectStore('lists', { keyPath: 'client_uuid' });
+      db.createObjectStore('list_items', { keyPath: 'client_uuid' });
+      db.createObjectStore('user_products', { keyPath: 'client_uuid' });
+      db.createObjectStore('store_products', { keyPath: 'client_uuid' });
+      db.createObjectStore('mutation_queue', { keyPath: 'client_uuid' });
+    }
+  });
+
+  await legacyDb.put('store_products', {
+    client_uuid: '10',
+    id: '10',
+    source: 'user',
+    name: 'Dream',
+    created_at: '2026-06-20T00:00:00.000Z'
+  });
+  await legacyDb.put('store_products', {
+    client_uuid: 'sp-real-uuid-untouched',
+    id: '11',
+    source: 'user',
+    name: 'Real item',
+    created_at: '2026-06-20T00:00:00.000Z'
+  });
+  await legacyDb.put('user_products', {
+    client_uuid: '7',
+    id: '7',
+    owner_type: 'user',
+    owner_id: 1,
+    term: 'corrupt legacy term',
+    normalized_term: 'corrupt legacy term',
+    created_at: '2026-06-20T00:00:00.000Z'
+  });
+  legacyDb.close();
+
+  // Triggers getDb(), which opens at the current DB_VERSION (3) and runs the
+  // cleanup step in upgrade() against the version-2 data written above.
+  const corruptRow = await getStoreProductByClientUuid('10');
+  const untouchedRow = await getStoreProductByClientUuid('sp-real-uuid-untouched');
+
+  expect(corruptRow).toBeFalsy();
+  expect(untouchedRow).toBeTruthy();
+  expect(untouchedRow?.name).toBe('Real item');
 });

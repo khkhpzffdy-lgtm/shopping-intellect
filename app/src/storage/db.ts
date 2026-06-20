@@ -347,6 +347,21 @@ export const clearDatabase = async () => {
   await deleteDB(DB_NAME);
 };
 
+// Used on every boot, after queued mutations have flushed successfully, so a
+// shared/family list always reflects the server exactly — a stale local copy
+// of a list another family member edited must never linger. Deliberately
+// leaves mutation_queue untouched (nothing here runs unless the queue is
+// already empty) and is the caller's job to repopulate these stores from a
+// fresh GET /lists + GET /lists/{id} pull immediately afterward.
+export const clearSyncedData = async () => {
+  const db = await getDb();
+  await Promise.all(
+    (['lists', 'list_items', 'user_products', 'store_products'] as const).map((storeName) =>
+      db.clear(storeName)
+    )
+  );
+};
+
 export const getListItem = async (clientUuid: string) => {
   const db = await getDb();
   return db.get('list_items', clientUuid);

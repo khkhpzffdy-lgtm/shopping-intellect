@@ -556,7 +556,7 @@ test('boot pull does not overwrite a local list with a pending mutation queued a
     entity_client_uuid: 'local-list-uuid-1'
   });
 
-  mockFetch.mockImplementation((input) => {
+  mockFetch.mockImplementation((input, init) => {
     const url = typeof input === 'string' ? input : input.toString();
 
     if (url.endsWith('/auth/refresh')) {
@@ -566,6 +566,16 @@ test('boot pull does not overwrite a local list with a pending mutation queued a
           { status: 200, headers: { 'Content-Type': 'application/json' } }
         )
       );
+    }
+
+    // The queued POST /lists mutation itself fails (real network error) —
+    // with the new full-hard-sync-on-boot flow, clearing+refetching only
+    // ever happens once every queued mutation has actually reached the
+    // server; if the create-list POST never got there, the server's /lists
+    // response is irrelevant and must never be allowed to clobber the
+    // not-yet-synced local list.
+    if (url.endsWith('/lists') && init?.method === 'POST') {
+      return Promise.reject(new Error('network error'));
     }
 
     if (url.endsWith('/lists')) {
@@ -626,7 +636,16 @@ test('opening a list pulls its items from the server when local IndexedDB has no
     }
 
     if (url.endsWith('/lists')) {
-      return Promise.resolve(new Response(JSON.stringify({ lists: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            lists: [
+              { id: '902', client_uuid: 'synced-list-uuid-1', name: 'Synced list', owner_type: 'user', owner_id: '13', updated_at: '2026-06-17T12:00:00.000Z' }
+            ]
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
     }
 
     if (url.endsWith('/lists/902')) {

@@ -5,6 +5,7 @@ import { sendMutation } from '../sync/sendMutation';
 import { useAuthStore } from '../store/auth';
 import { useThemeStore } from '../store/theme';
 import {
+  clearSyncedData,
   deleteList,
   deleteListItem,
   enqueueMutation,
@@ -92,58 +93,57 @@ export const HomeScreen = () => {
   };
 
   useEffect(() => {
-    void refreshLists();
-
-    const pullListsFromServer = async () => {
-      try {
-        const { lists: serverLists } = await fetchLists();
-        await Promise.all(serverLists.map((serverList) => mergeServerList(serverList)));
-        await refreshLists();
-      } catch {
-        // Offline boot or network failure — keep showing the local-first data (07 §3.3).
-      }
-    };
-
-    void pullListsFromServer();
-  }, []);
-
-  useEffect(() => {
-    if (!selectedListKey) {
-      return;
-    }
-
-    void refreshItems(selectedListKey);
-
-    const serverListId = selectedList?.id;
-    if (!serverListId) {
-      // List hasn't synced yet — nothing to pull until it has a server id.
-      return;
-    }
-
-    const pullListItemsFromServer = async () => {
-      try {
-        const { items: serverItems } = await fetchListWithItems(serverListId);
-        await Promise.all(serverItems.map((serverItem) => mergeServerListItem(serverItem, selectedListKey)));
-        await refreshItems(selectedListKey);
-      } catch {
-        // Offline boot or network failure — keep showing the local-first data (07 §3.3).
-      }
-    };
-
-    void pullListItemsFromServer();
-  }, [selectedListKey, selectedList?.id]);
-
-  useEffect(() => {
     if (!user) {
       return;
     }
 
     let isActive = true;
 
-    const runQueuedMutationDrain = async () => {
+    // Full hard sync, run on every boot and every 'online' transition while
+    // logged in — required for shared/family lists: a stale local copy of a
+    // list another family member just edited must never linger. Order
+    // matters: only clear+refetch once every queued mutation has actually
+    // reached the server, so an offline-made edit is never silently dropped
+    // by being overwritten with a now-stale server response.
+    const runFullHardSync = async () => {
       try {
-        await flushQueuedMutations();
-      } finally {
+        const flushResult = await flushQueuedMutations();
+
+        if (!isActive) {
+          return;
+        }
+
+        if (flushResult.failed > 0) {
+          // Something is still unsynced (offline, or the server rejected it)
+          // — keep showing local-first data rather than risk deleting an
+          // edit that hasn't actually reached the server yet (07 §3.3).
+          await refreshLists();
+          const listKey = selectedListKeyRef.current;
+          if (listKey) {
+            await refreshItems(listKey);
+          }
+          return;
+        }
+
+        const { lists: serverLists } = await fetchLists();
+
+        if (!isActive) {
+          return;
+        }
+
+        await clearSyncedData();
+
+        await Promise.all(serverLists.map((serverList) => mergeServerList(serverList)));
+
+        await Promise.all(
+          serverLists.map(async (serverList) => {
+            const { items: serverItems } = await fetchListWithItems(serverList.id);
+            await Promise.all(
+              serverItems.map((serverItem) => mergeServerListItem(serverItem, serverList.client_uuid))
+            );
+          })
+        );
+
         if (!isActive) {
           return;
         }
@@ -153,13 +153,25 @@ export const HomeScreen = () => {
         if (listKey) {
           await refreshItems(listKey);
         }
+      } catch {
+        // Offline boot or network failure — keep showing whatever local data
+        // survived (07 §3.3). Nothing was cleared, since clearSyncedData()
+        // only runs after fetchLists() above has already succeeded.
+        if (!isActive) {
+          return;
+        }
+        await refreshLists();
+        const listKey = selectedListKeyRef.current;
+        if (listKey) {
+          await refreshItems(listKey);
+        }
       }
     };
 
-    void runQueuedMutationDrain();
+    void runFullHardSync();
 
     const handleOnline = () => {
-      void runQueuedMutationDrain();
+      void runFullHardSync();
     };
 
     window.addEventListener('online', handleOnline);
@@ -169,6 +181,14 @@ export const HomeScreen = () => {
       window.removeEventListener('online', handleOnline);
     };
   }, [user]);
+
+  useEffect(() => {
+    if (!selectedListKey) {
+      return;
+    }
+
+    void refreshItems(selectedListKey);
+  }, [selectedListKey]);
 
   const handleLogout = async () => {
     try {

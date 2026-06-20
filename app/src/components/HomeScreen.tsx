@@ -1,4 +1,4 @@
-import { ApiError, fetchListWithItems, fetchLists, logout } from '../api/client';
+import { ApiError, apiRequest, fetchListWithItems, fetchLists, logout } from '../api/client';
 import { clearScheduledRefresh } from '../api/session';
 import { flushQueuedMutations } from '../sync/flush';
 import { sendMutation } from '../sync/sendMutation';
@@ -401,8 +401,34 @@ export const HomeScreen = () => {
       return;
     }
 
-    const userProduct = await getUserProduct(item.user_product_client_uuid);
+    setErrorMessage(null);
+    let userProduct = await getUserProduct(item.user_product_client_uuid);
+
+    if (!userProduct && user) {
+      // The local user_products cache can miss a row that a list item still
+      // references — e.g. a hard sync clears the store before that item's
+      // own merge writes it back. Fall back to the server rather than
+      // silently doing nothing, which just looks like the tile isn't
+      // clickable.
+      try {
+        const response = await apiRequest<{ user_products?: UserProductRecord[] }>(
+          `/user-products?owner_type=user&owner_id=${user.id}`,
+          { authenticated: true }
+        );
+        const found = (response.user_products ?? []).find(
+          (candidate) => candidate.client_uuid === item.user_product_client_uuid
+        );
+        if (found) {
+          await putUserProduct(found);
+          userProduct = found;
+        }
+      } catch {
+        // Offline — nothing more we can do locally.
+      }
+    }
+
     if (!userProduct) {
+      setErrorMessage('Този артикул не може да се отвори в момента.');
       return;
     }
 

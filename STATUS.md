@@ -857,6 +857,30 @@ isn't installed in this sandbox, so this slice was verified via PHPUnit + Vitest
 (real DOM render/click/blur) + `tsc`/`vite build`, not an actual rendered-browser
 screenshot — Owner should still eyeball the real flow on `shopping.flux.bg` per usual.
 
+**§2.8a fix (2026-06-20): item tiles going permanently unclickable after navigating a
+few screens.** Owner-reported on `shopping.flux.bg`: after opening/closing a couple of
+lists, planning-mode tiles stopped responding to taps. Root cause:
+`HomeScreen::handleOpenItemDetail()` looked up the tapped item's UserProduct **only**
+in the local `user_products` IndexedDB store and silently `return`ed if that lookup
+missed — which looks identical to "not clickable" from the Owner's side. A list item's
+`user_product_client_uuid` can outlive its own `user_products` row locally (e.g. the
+hard sync's `clearSyncedData()` wipes `user_products` before that specific item's own
+`mergeServerListItem()` call has re-populated it). Fix: on a local cache miss,
+`handleOpenItemDetail()` now falls back to `GET /user-products` (same endpoint
+`AddSearchScreen` already uses) before giving up, and a definitive failure now shows a
+visible `setErrorMessage(...)` instead of doing nothing. Confirmed as a real regression
+risk, not a hypothetical: reverting just this fix (`git stash` on `HomeScreen.tsx`
+alone) reproduces the silent-failure timeout in the two new tests below before the fix,
+and they pass after it. New test file `src/test/itemDetailOpen.test.tsx` (2 tests,
+seeds a list item whose `user_product_client_uuid` has no matching local
+`user_products` row, asserts the server-fallback opens the screen, and that a
+double-miss surfaces the inline error rather than silence). **Not yet confirmed
+whether this fully explains every occurrence** — the exact trigger (which precise hard
+sync timing/ordering produces the missing local row) wasn't reproduced end-to-end, only
+the resulting cache-miss-then-silent-failure symptom; if tiles still go unclickable
+after this deploys, that points at a different/additional cause and needs fresh
+Owner repro steps (which screens, in what order, online or offline at the time).
+
 **2026-06-17 production incident — sync pipeline, four stacked bugs.** Every list/item was stuck
 `sync-pending` forever. Root-caused and fixed live (outside the normal Slice flow, by explicit
 Owner direction, since it was actively breaking production):

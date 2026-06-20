@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
+import { startUpdateCheck } from './updateCheck';
 import './index.css';
 import './theme.css';
 import './list-screens.css';
@@ -13,6 +14,8 @@ if ('serviceWorker' in navigator) {
     void Promise.all(registrations.map((registration) => registration.unregister()));
   });
 }
+
+startUpdateCheck();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

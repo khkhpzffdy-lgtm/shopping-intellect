@@ -1009,6 +1009,39 @@ Changes:
   clean. `App.test.tsx` still has its pre-existing, unrelated 10s-hook-timeout failures
   (confirmed via `git stash` to predate this entire session).
 
+**§2.8a follow-up (2026-06-21): category editing — the one field the restyle left
+read-only.** The Owner's only remaining gap: categories should be changeable, with an
+unlimited number attachable. Checked the schema/`decisions.md` first rather than
+guessing — `§4.0e` (2026-06-19) already decided unlimited many-to-many product↔category
+via the `oCk_si_product_categories` junction table, so **no new schema** was needed,
+just the missing plumbing: **(1)** `attachCategory()` existed, `detachCategory()`
+didn't — added, mirrors it exactly. **(2)** `Category::$parentId` was loaded from the DB
+on every `GET /categories` call but never put in the response — `CategoryController`
+now includes `parent_id`, needed for the frontend to group by parent. **(3)** No
+endpoint accepted a category change at all — `UserProductService::setCategories()`
+diffs the desired list against `categoryIdsFor()` and attaches/detaches only the delta,
+wired as an optional `category_ids` array on the existing `PATCH /user-products/{id}`.
+**Owner-confirmed decision:** a `system`-owned seeded row's categories stay locked for
+an ordinary user, same reasoning as `is_favorite`/term — the junction table has no
+per-owner column, so one user's edit would silently change it for everyone. **Owner-
+confirmed UI:** one bulk "set categories" PATCH (not per-tick attach/detach calls), a
+flat list grouped by parent (one level of indentation, not a full collapsible tree).
+New `CategoryPicker.tsx` (checkboxes, root categories as bold headers, children indented
+underneath), opened from a new "+ Категория"/"Промени" chip next to the existing
+read-only category chips in `UserProductDetailScreen.tsx`'s hero (hidden entirely for
+`system`-owned rows). `HomeScreen.tsx` gained `handleSetCategories()`, same optimistic-
+local → enqueue → `sendMutation` shape as `handleSetFavorite()`. Backend: 6 new PHPUnit
+tests (163 total, was 157). Frontend: 3 new Vitest tests in `userProductDetail.test.tsx`
+(11 total, was 8). **Caught a real gap in this session's own process while shipping
+this**: every earlier `tsc --noEmit` check this session (bare, no `-b`/`--project` flag)
+was silently checking nothing — root `tsconfig.json` has `files: []` and only
+`references`, so bare `tsc --noEmit` doesn't resolve them; the project's actual gate is
+`tsc -b` (what `npm run build` already runs, which *was* run before every push this
+session — so nothing broken actually shipped, but the extra "type-check passed clean"
+confirmations were false signal). Caught when `tsc -b` correctly flagged a missing
+required prop that bare `tsc --noEmit` had reported as clean. Use `npx tsc -b` (or
+`npm run build`) going forward, never bare `tsc --noEmit`, in this repo.
+
 **2026-06-17 production incident — sync pipeline, four stacked bugs.** Every list/item was stuck
 `sync-pending` forever. Root-caused and fixed live (outside the normal Slice flow, by explicit
 Owner direction, since it was actively breaking production):

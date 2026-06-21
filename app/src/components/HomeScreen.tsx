@@ -555,6 +555,37 @@ export const HomeScreen = () => {
     }
   };
 
+  const handleSetCategories = async (userProduct: UserProductRecord, categoryIds: string[]) => {
+    if (userProduct.owner_type === 'system') {
+      return;
+    }
+
+    const updated: UserProductRecord = { ...userProduct, category_ids: categoryIds };
+    await putUserProduct(updated);
+    setDetailUserProduct(updated);
+
+    const mutationUuid = generateUuid();
+    await enqueueMutation({
+      client_uuid: mutationUuid,
+      endpoint: `/user-products/${userProduct.id ?? userProduct.client_uuid}`,
+      method: 'PATCH',
+      body: { category_ids: categoryIds },
+      created_at: new Date().toISOString(),
+      attempts: 0,
+      status: 'pending',
+      entity_client_uuid: userProduct.client_uuid
+    });
+
+    try {
+      const claimedMutation = await markMutationInFlight(mutationUuid);
+      if (claimedMutation) {
+        await sendMutation(claimedMutation);
+      }
+    } catch {
+      // Keep local optimistic state and the pending mutation.
+    }
+  };
+
   const handleRemoveItem = async (item: ListItemView) => {
     if (!selectedList) {
       return;
@@ -773,6 +804,7 @@ export const HomeScreen = () => {
               userProduct={detailUserProduct}
               onRename={(newTerm) => handleRenameUserProduct(detailUserProduct, newTerm)}
               onSetFavorite={(isFavorite) => handleSetFavorite(detailUserProduct, isFavorite)}
+              onSetCategories={(categoryIds) => handleSetCategories(detailUserProduct, categoryIds)}
               onUpdateItem={(patch) => handleUpdateItem(itemDetailItem, patch)}
             />
           </div>

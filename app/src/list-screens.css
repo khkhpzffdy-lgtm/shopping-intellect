@@ -267,3 +267,14 @@
 }
 .si-root .stepper button:disabled { opacity: .4; cursor: default; }
 .si-root .stepper__v { font-size: var(--fs-h2); font-weight: 700; font-variant-numeric: tabular-nums; min-width: 22px; text-align: center; }
+.si-root .catchip--add { background: var(--card-2); border: 1px dashed var(--line-2); color: var(--ink-2); cursor: pointer; }
+
+/* ---- Category picker (flat list grouped by parent) ---- */
+.si-root .catpick__row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 4px; border-bottom: 1px solid var(--line);
+  font-size: var(--fs-body); color: var(--ink); cursor: pointer;
+}
+.si-root .catpick__row--parent { font-weight: 700; }
+.si-root .catpick__row--child { padding-left: 28px; color: var(--ink-2); }
+.si-root .catpick__row input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--accent); }

@@ -92,6 +92,7 @@ describe('UserProductDetailScreen', () => {
         userProduct={baseUserProduct}
         onRename={async () => ({ ok: true })}
         onSetFavorite={() => {}}
+        onSetCategories={() => {}}
         onUpdateItem={() => {}}
       />
     );
@@ -109,6 +110,7 @@ describe('UserProductDetailScreen', () => {
         userProduct={baseUserProduct}
         onRename={onRename}
         onSetFavorite={() => {}}
+        onSetCategories={() => {}}
         onUpdateItem={() => {}}
       />
     );
@@ -130,6 +132,7 @@ describe('UserProductDetailScreen', () => {
         userProduct={baseUserProduct}
         onRename={(newTerm) => renameViaRealPersistence(baseUserProduct, newTerm)}
         onSetFavorite={() => {}}
+        onSetCategories={() => {}}
         onUpdateItem={() => {}}
       />
     );
@@ -155,6 +158,7 @@ describe('UserProductDetailScreen', () => {
         userProduct={baseUserProduct}
         onRename={(newTerm) => renameViaRealPersistence(baseUserProduct, newTerm)}
         onSetFavorite={() => {}}
+        onSetCategories={() => {}}
         onUpdateItem={() => {}}
       />
     );
@@ -178,6 +182,7 @@ describe('UserProductDetailScreen', () => {
         userProduct={systemProduct}
         onRename={async () => ({ ok: true })}
         onSetFavorite={() => {}}
+        onSetCategories={() => {}}
         onUpdateItem={() => {}}
       />
     );
@@ -195,6 +200,7 @@ describe('UserProductDetailScreen', () => {
         userProduct={baseUserProduct}
         onRename={async () => ({ ok: true })}
         onSetFavorite={() => {}}
+        onSetCategories={() => {}}
         onUpdateItem={onUpdateItem}
       />
     );
@@ -214,6 +220,7 @@ describe('UserProductDetailScreen', () => {
         userProduct={baseUserProduct}
         onRename={async () => ({ ok: true })}
         onSetFavorite={() => {}}
+        onSetCategories={() => {}}
         onUpdateItem={onUpdateItem}
       />
     );
@@ -230,6 +237,7 @@ describe('UserProductDetailScreen', () => {
         userProduct={baseUserProduct}
         onRename={async () => ({ ok: true })}
         onSetFavorite={() => {}}
+        onSetCategories={() => {}}
         onUpdateItem={onUpdateItem}
       />
     );
@@ -240,5 +248,83 @@ describe('UserProductDetailScreen', () => {
     await userEvent.tab();
 
     expect(onUpdateItem).toHaveBeenCalledWith({ unit: 'кг' });
+  });
+
+  test('category chip opens a picker grouped by parent, and saving calls onSetCategories', async () => {
+    mockedApiRequest.mockResolvedValue({
+      categories: [
+        { id: '1', name: 'Млечни', parent_id: null },
+        { id: '2', name: 'Зеленчуци', parent_id: null },
+        { id: '3', name: 'Кисело мляко', parent_id: '1' }
+      ]
+    });
+    const onSetCategories = vi.fn();
+
+    render(
+      <UserProductDetailScreen
+        item={baseItem}
+        userProduct={baseUserProduct}
+        onRename={async () => ({ ok: true })}
+        onSetFavorite={() => {}}
+        onSetCategories={onSetCategories}
+        onUpdateItem={() => {}}
+      />
+    );
+
+    await userEvent.click(await screen.findByText('Промени'));
+
+    const picker = await screen.findByTestId('category-picker');
+    expect(picker).toBeInTheDocument();
+    // "Млечни" (already attached) should be checked, its child indented under it.
+    expect(screen.getByRole('checkbox', { name: 'Млечни' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Кисело мляко' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Зеленчуци' })).not.toBeChecked();
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Зеленчуци' }));
+    await userEvent.click(screen.getByText('Готово'));
+
+    expect(onSetCategories).toHaveBeenCalledWith(['1', '2']);
+  });
+
+  test('shows "+ Категория" when none are attached yet, and the picker is hidden for a system-owned term', async () => {
+    mockedApiRequest.mockResolvedValue({ categories: [{ id: '1', name: 'Млечни', parent_id: null }] });
+
+    render(
+      <UserProductDetailScreen
+        item={baseItem}
+        userProduct={{ ...baseUserProduct, category_ids: [] }}
+        onRename={async () => ({ ok: true })}
+        onSetFavorite={() => {}}
+        onSetCategories={() => {}}
+        onUpdateItem={() => {}}
+      />
+    );
+
+    expect(await screen.findByText('+ Категория')).toBeInTheDocument();
+  });
+
+  test('category chip is not shown for a system-owned term with no categories, and no add affordance appears', async () => {
+    mockedApiRequest.mockResolvedValue({ categories: [] });
+    const systemProduct: UserProductRecord = {
+      ...baseUserProduct,
+      owner_type: 'system',
+      is_global_default: true,
+      category_ids: []
+    };
+
+    render(
+      <UserProductDetailScreen
+        item={baseItem}
+        userProduct={systemProduct}
+        onRename={async () => ({ ok: true })}
+        onSetFavorite={() => {}}
+        onSetCategories={() => {}}
+        onUpdateItem={() => {}}
+      />
+    );
+
+    await waitFor(() => expect(mockedApiRequest).toHaveBeenCalled());
+    expect(screen.queryByText('+ Категория')).not.toBeInTheDocument();
+    expect(screen.queryByText('Промени')).not.toBeInTheDocument();
   });
 });

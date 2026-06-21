@@ -106,15 +106,23 @@ export const AddSearchScreen = ({ selectedList, onItemAdded, isActive = true }: 
       await putListItem(optimisticItem);
       await touchListUpdatedAt(selectedList.client_uuid, now);
 
+      // If `product` already has a server id (always true for system-seeded
+      // catalog terms, since those only ever arrive via the server fetch in
+      // loadTerms()), reference it by id. Re-sending its client_uuid inline
+      // would tell the server to *create* a new row with that uuid, which
+      // collides with the row that already owns it — fatally for a
+      // system-seeded term, since it's never owned by this user and the
+      // server's duplicate-replay lookup can't find it under this owner.
+      // Only a term created locally and not yet synced (no id yet) still
+      // needs the inline create-on-write path.
       const mutationBody = {
         client_uuid: itemClientUuid,
         quantity: 1,
         unit: 'piece',
         is_checked: false,
-        user_product: {
-          client_uuid: product.client_uuid,
-          term: product.term
-        }
+        ...(product.id
+          ? { user_product_id: product.id }
+          : { user_product: { client_uuid: product.client_uuid, term: product.term } })
       };
 
       await enqueueMutation({

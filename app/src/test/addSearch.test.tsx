@@ -30,7 +30,12 @@ beforeEach(async () => {
   mockedApiRequest.mockReset();
   await clearDatabase();
   useAuthStore.getState().setSession({
-    accessToken: makeToken({ user_id: 7, family_ids: [], display_name: 'Ива' }),
+    // makeToken()'s payload goes through plain btoa(), which throws on any
+    // non-Latin1 character (real JS behavior, not an environment quirk) —
+    // keep it ASCII-only. The Cyrillic display name below is what the UI
+    // actually reads; setSession()'s explicit `user` wins over anything
+    // decoded from the token.
+    accessToken: makeToken({ user_id: 7, family_ids: [], display_name: 'Iva' }),
     expiresIn: 900,
     user: { id: 7, displayName: 'Ива', familyIds: [] }
   });
@@ -169,8 +174,8 @@ describe('AddSearchScreen — search', () => {
       (call) => call[0] === '/lists/42/items' && (call[1] as { method?: string })?.method === 'POST'
     );
     expect(postCall).toBeDefined();
-    const body = (postCall![1] as { body?: { user_product?: { client_uuid?: string } } })?.body;
-    expect(body?.user_product?.client_uuid).toBe('up-2');
+    const body = (postCall![1] as { body?: { user_product_id?: string } })?.body;
+    expect(body?.user_product_id).toBe('55');
   });
 
   test('"добави нов" posts inline user_product with term and client_uuid and calls onItemAdded', async () => {

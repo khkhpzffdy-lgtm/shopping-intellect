@@ -909,6 +909,39 @@ newly-added field. **Verified, not assumed:** reverted just this one-line-pair v
 gained a field`) fails on the old `>=` guard and passes on `>`. This self-heals on the
 next hard sync after deploy — no migration needed, no manual data fix.
 
+**§2.8a fix #3 (2026-06-21): selecting an existing autocomplete term threw a sync
+error.** Owner-reported: picking an *existing* term from Add/Search's search results
+(not "добави нов термин") showed the failed-sync (exclamation) icon. Root cause was
+already diagnosed and fixed in a **prior, uncommitted** local change to
+`AddSearchScreen.tsx` that had been sitting in the working tree this whole time without
+ever being pushed — so `shopping.flux.bg` never actually had the fix, despite it
+looking "already handled" in the source. The bug itself: selecting an existing term
+(in particular a `system`-owned seeded one) re-sent it inline as
+`user_product: { client_uuid: product.client_uuid, term }`. Server-side,
+`ListService::createInlineUserProduct()` → `UserProductService::findOrCreate()` looks
+up an existing row scoped to the *list's own* `owner_type`/`owner_id` — a `system`-owned
+row never matches that scope, so it falls through to `insert()` with the **incoming
+client_uuid**, which collides with the client_uuid the seeded row already owns →
+`DuplicateClientUuidException`. `findOrCreate()`'s catch only re-checks for an
+owner-scoped match (still none, same reason) and re-throws — and
+`ListController::handleCreateItem()` only catches `\InvalidArgumentException`, so this
+exception was uncaught, producing a 500 and the failed-sync icon. The fix (now verified
+and shipped): when `product.id` is already known, send `user_product_id` instead of
+re-sending the inline create payload — only a term created locally and never yet synced
+(no `id` yet) still needs the inline path. **Verified, not assumed:** the matching test
+in `addSearch.test.tsx` ("selecting an existing term posts ... with user_product_id")
+was *also* sitting uncommitted; running the full file surfaced a second, unrelated,
+genuinely-universal bug — `makeToken()`'s test helper called plain `btoa()` on a payload
+containing Cyrillic, which throws `InvalidCharacterError` in any JS engine (not a sandbox
+quirk, despite that being this file's standing excuse in earlier entries) — fixed by
+keeping the *token's* payload ASCII-only (the explicit `user:` field passed to
+`setSession()` is what the UI actually reads, untouched, still Cyrillic). With that
+fixed, all 13 tests in the file pass, confirming the product fix is correct. **Separate
+finding, not fixed here:** `app/.github/workflows/deploy.yml` never runs `npm test` —
+only `tsc -b && vite build` — so a broken test file (like this one was, universally,
+for months) can never block a deploy; nothing today gates merges on the Vitest suite
+passing. Worth a future slice. Pushed to `main`.
+
 **2026-06-17 production incident — sync pipeline, four stacked bugs.** Every list/item was stuck
 `sync-pending` forever. Root-caused and fixed live (outside the normal Slice flow, by explicit
 Owner direction, since it was actively breaking production):

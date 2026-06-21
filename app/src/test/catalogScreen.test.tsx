@@ -29,6 +29,28 @@ describe('CatalogScreen', () => {
     expect(mockedApiRequest).toHaveBeenCalledWith('/categories');
   });
 
+  test('groups child categories under their parent, indented', async () => {
+    mockedApiRequest.mockResolvedValue({
+      categories: [
+        { id: '1', slug: 'dairy_products', name: 'Млечни продукти', parent_id: null },
+        { id: '2', slug: 'milk', name: 'Мляко', parent_id: '1' },
+        { id: '3', slug: 'eggs', name: 'Яйца', parent_id: null }
+      ]
+    });
+
+    render(<CatalogScreen />);
+
+    const parentRow = await screen.findByText('Млечни продукти');
+    const childRow = await screen.findByText('Мляко');
+    const otherRoot = await screen.findByText('Яйца');
+
+    expect(parentRow).toBeInTheDocument();
+    expect(childRow).toBeInTheDocument();
+    expect(otherRoot).toBeInTheDocument();
+    expect(childRow.closest('article')).toHaveStyle({ paddingLeft: '32px' });
+    expect(parentRow.closest('article')).not.toHaveStyle({ paddingLeft: '32px' });
+  });
+
   test('shows empty state when there are no categories', async () => {
     mockedApiRequest.mockResolvedValue({ categories: [] });
 

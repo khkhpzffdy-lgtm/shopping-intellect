@@ -1042,6 +1042,20 @@ confirmations were false signal). Caught when `tsc -b` correctly flagged a missi
 required prop that bare `tsc --noEmit` had reported as clean. Use `npx tsc -b` (or
 `npm run build`) going forward, never bare `tsc --noEmit`, in this repo.
 
+**§2.8a follow-up #2 (2026-06-21): "Каталог" tab also groups by parent now.** The
+Owner asked why category breadth was hard to tell apart from products in the new
+picker; turned out `CatalogScreen.tsx` (the "Каталог" tab) was the real source of the
+same confusion — it rendered all ~45 categories (25 new broad roots + the 20 older,
+narrower ones from `SeedCategoriesMigration` re-parented under them by `§4.0e`, see the
+"Owner-confirmed: leave the old 20 as legitimate narrower sub-categories" note above) in
+one flat, unordered list with zero hierarchy. `CatalogScreen.tsx` now groups the same
+way the picker does — root categories as top-level rows, children indented underneath
+(`paddingLeft: 32`, lighter `--ink-2` text) — reusing the existing `.git`/`.git__main`
+row markup, no new CSS needed. New test in `catalogScreen.test.tsx` asserting a child
+renders indented under its parent. Confirms this is purely a display grouping fix —
+**no category data was changed or removed** (Owner explicitly chose to keep the old 20
+as real, legitimate narrower sub-categories, not delete/merge them).
+
 **2026-06-17 production incident — sync pipeline, four stacked bugs.** Every list/item was stuck
 `sync-pending` forever. Root-caused and fixed live (outside the normal Slice flow, by explicit
 Owner direction, since it was actively breaking production):

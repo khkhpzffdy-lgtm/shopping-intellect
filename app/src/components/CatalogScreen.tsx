@@ -6,6 +6,7 @@ type CategoryDto = {
   id: string;
   slug: string;
   name: string;
+  parent_id?: string | null;
 };
 
 type CatalogScreenProps = {
@@ -69,14 +70,28 @@ export const CatalogScreen = ({ isActive = true }: CatalogScreenProps) => {
     );
   }
 
+  const roots = categories.filter((category) => !category.parent_id);
+  const childrenOf = (parentId: string) => categories.filter((category) => category.parent_id === parentId);
+
   return (
     <div className="glist">
-      {categories.map((category) => (
-        <article key={category.id} className="git">
-          <div className="git__main">
-            <div className="git__name">{category.name}</div>
-          </div>
-        </article>
+      {roots.map((root) => (
+        <div key={root.id}>
+          <article className="git">
+            <div className="git__main">
+              <div className="git__name">{root.name}</div>
+            </div>
+          </article>
+          {childrenOf(root.id).map((child) => (
+            <article key={child.id} className="git" style={{ paddingLeft: 32 }}>
+              <div className="git__main">
+                <div className="git__name" style={{ fontWeight: 500, color: 'var(--ink-2)' }}>
+                  {child.name}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
       ))}
     </div>
   );

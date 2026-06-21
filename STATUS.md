@@ -401,10 +401,10 @@ slice (the `categories` table and its seed already existed from `§0.4`), so no
 deactivate/reactivate step is required — `GET /categories` should work immediately once the
 plugin's `main` branch FTP-deploys.
 
-**Build order (2026-06-19, revised — added §4.0c-fix):** §3.1 (done) → §4.0 (done) → §2.3a (done) → §2.3b (done) → §2.3c (done)
+**Build order (2026-06-21, revised — §4.0d done):** §3.1 (done) → §4.0 (done) → §2.3a (done) → §2.3b (done) → §2.3c (done)
 → §2.2d (done) → §2.3d (done) → §4.0b (done) → §2.6 (done) → §2.7 (done) → §4.0c (done) →
-§4.0c-fix (done) → §4.0e (done) → §4.0f (done) → §2.8a (done) → §2.8b (done) →
-**§4.0d (next) → §2.9** →
+§4.0c-fix (done) → §4.0e (done) → §4.0f (done) → §2.8a (done) → §2.8b (done) → §4.0d (done) →
+**§2.9 (next)** →
 §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 (Family) → §2.5 (Favorites) → M5.
 **2026-06-18/19 re-sequencing:** the Owner asked for list management (delete/rename), item/
 product detail management, Catalog product management, and a Profile screen to be fully
@@ -1118,6 +1118,89 @@ field now actually reaches the server, and two new `resolveEndpoint()` cases in
 `vite build` clean. `App.test.tsx`/`flush.test.ts`'s pre-existing, unrelated timeout
 failures reconfirmed via `git stash` to predate this session, same standing issue
 noted in earlier `§2.8a` entries — still unfixed, still out of scope here.
+
+**§4.0d is done (2026-06-21).** Catalog bucket detail — tapping a category in the
+Каталог tab now opens `CategoryDetailScreen.tsx` instead of doing nothing.
+**Backend (plugin repo):** `CategoryRepositoryInterface` gained `find(int $id): ?Category`
+(needed for the new endpoint's 404 check — didn't exist before this slice, despite
+`listAll()`/`findChildren()` already being there). `UserProductRepositoryInterface`
+gained `listByOwnerAndCategory()` (single query joining `product_categories`, merges
+the owner's own rows with `system`-owned global defaults attached to the same
+category — same merge `UserProductController::handleList()` already did in PHP, done
+here in SQL instead). `StoreProductRepositoryInterface` gained
+`listByCreatorAndCategory()` (creator + category + not-archived). `ListItemRepositoryInterface`
+gained `existsActiveForUserProduct()`/`existsActiveForStoreProduct()` — `list_items` has
+no soft-delete column, so "active" just means "a row exists." New
+`Services/UserProductInUseException.php`/`StoreProductInUseException.php`. `UserProductService::archive()`
+now calls the new check before flipping `is_archived`, throwing the new exception if
+still referenced (constructor gained one new optional trailing
+`?ListItemRepositoryInterface $listItems` param, same nullable-optional-collaborator
+shape as `StoreProductService`'s existing `$barcodes` — existing call sites that don't
+exercise archive needed no changes). `StoreProductService` gained `archive()` from
+scratch, same guard shape, reusing the existing `ownedUserSourcedStoreProduct()` ownership
+check from §2.8b (creator-only on `source='user'` rows) — also gained the same optional
+`$listItems` param. `UserProductController`/`StoreProductController`'s `PATCH` handlers
+both gained an `is_archived` field (mapped to the new `archive()` calls, `in_use`
+exception → 409). `CategoryController` gained `GET /categories/{id}/products`
+(bearer-auth, unlike the existing public `/categories` list — it returns owner-scoped
+data) returning `{ category, children, user_products, store_products }`, reusing
+`UserProductController::userProductData()`/`StoreProductController::storeProductData()`
+(both flipped from `private` to `public` for this reuse, no shape change) rather than
+inventing a third response shape — `Plugin.php`'s wiring reordered so `CategoryController`
+is built after both of those controllers, since it now depends on them. Two gaps found
+only while building the frontend, not in the original spec: **(1)** `StoreProductController`
+had no `POST /store-products` route at all — added one (`findOrCreate()` + optional
+`category_id` attach in the same request) so "create a specific item directly into this
+bucket" doesn't need a list to exist first. **(2)** both new create endpoints
+(`POST /user-products`, `POST /store-products`) gained an optional `category_id` param
+that attaches the new row to that category in the same request, avoiding a second
+PATCH round-trip from the frontend. 24 new backend tests (repository, service, and
+controller levels) — 208 total, was 184, all green.
+**Archive UX — reactive, not proactive-disable**: `decisions.md`'s original wording
+("disabled") was amended during this slice (see "Resolved — Catalog becomes 'browse my
+products'" amendment, 2026-06-21) to match what actually shipped — tap archive, 409
+`in_use` if still on a list, inline error message; a proactively-grayed-out button would
+need the list endpoint to also return an in-use flag per row, a bigger change for the
+same end-user outcome. **Frontend (app repo):** new `CategoryDetailScreen.tsx` — fetches
+`/categories/{id}/products` on mount; renders child categories as tappable rows that
+recurse into another `CategoryDetailScreen` instance (component-recursion as the
+drill-down stack, no new global nav state); renders attached UserProduct/StoreProduct
+rows reusing `ListScreen.tsx`'s `.git`/`.git__main` tile markup; tapping a row opens the
+existing `UserProductDetailScreen`/`StoreProductDetailScreen` (both needed their
+`item: ListItemView` prop made optional — `UserProductDetailScreen` additionally needed
+its quantity/unit `<div className="group">` block wrapped in `{item && onUpdateItem ? ... : null}`
+since that block has no meaning outside a list-item context; `StoreProductDetailScreen`
+never read `item` at all, so making it optional there was a pure type change); a "+ Нов
+термин"/"+ Конкретен артикул" pair of inline forms (mirrors `AddSearchScreen.tsx`'s
+manual-item form) creates directly into the bucket via the two `category_id`-aware POST
+endpoints above; "Архивирай" per row calls the new archive PATCH, shows the 409 message
+inline on `in_use`; "+ Списък" opens an inline list picker. **Resolved the spec's
+open question as (a)**: `CategoryDetailScreen` does its own independent
+`GET /categories/{id}/products` and `GET /lists` (via the existing `fetchLists()` helper)
+rather than receiving state from `HomeScreen.tsx`/`App.tsx` — confirmed while reading the
+current code that `CatalogScreen.tsx` and `HomeScreen.tsx` are still rendered as
+`display:none`-toggled siblings with no shared state, same as when the spec was written.
+**A scope line drawn during the build, not explicit in the spec**: catalog-management
+writes (archive, create-into-bucket, rename/favorite/categories edits opened from this
+screen) go through plain `apiRequest` calls, not the offline mutation queue
+(`enqueueMutation`/`sendMutation`) every list-domain write in this app uses — "add to
+list" from this screen is the one exception, and *does* go through the full queue, since
+the target list is offline-critical the same way it is from `AddSearchScreen.tsx`.
+Catalog browsing/editing itself was never specified as needing to work offline (`07
+§3.3`'s offline guarantees are scoped to the shopping-list domain), so this avoids
+duplicating the full local-first IndexedDB mirror for a screen that doesn't need it —
+worth Owner confirmation if that assumption is wrong. `CatalogScreen.tsx`'s root/child
+rows gained `onClick` opening `CategoryDetailScreen` for that row's category id. New
+`categoryDetailScreen.test.tsx` (6 tests: renders children + attached records, drill-down,
+archive succeeds, archive blocked shows the in-use message not a raw error, create-term
+attaches immediately, system-owned row has no archive button). `npx tsc -b && vite build`
+and the directly-affected Vitest files (`catalogScreen`, `userProductDetail`,
+`storeProductDetail`, `categoryDetailScreen`, `bottomNav`) all green. **Owner verification
+on shopping.flux.bg is outstanding** — confirm after deploy: tapping a category in
+Каталог opens its bucket detail; child categories drill down; creating a term/item
+attaches it immediately (visible on reload); archiving something still on a list is
+blocked with a clear message; editing from here opens the same detail screen reachable
+from a list; a seeded term still can't be edited/archived by an ordinary user.
 
 **2026-06-17 production incident — sync pipeline, four stacked bugs.** Every list/item was stuck
 `sync-pending` forever. Root-caused and fixed live (outside the normal Slice flow, by explicit

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiRequest } from '../api/client';
+import { CategoryDetailScreen } from './CategoryDetailScreen';
 import { SkeletonLoader } from './SkeletonLoader';
 
 type CategoryDto = {
@@ -16,6 +17,7 @@ type CatalogScreenProps = {
 export const CatalogScreen = ({ isActive = true }: CatalogScreenProps) => {
   const [categories, setCategories] = useState<CategoryDto[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [openCategoryId, setOpenCategoryId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isActive) return;
@@ -78,21 +80,35 @@ export const CatalogScreen = ({ isActive = true }: CatalogScreenProps) => {
       {roots.map((root) => (
         <div key={root.id}>
           <article className="git">
-            <div className="git__main">
+            <button
+              type="button"
+              className="git__main"
+              style={{ background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', padding: 0 }}
+              onClick={() => setOpenCategoryId(root.id)}
+            >
               <div className="git__name">{root.name}</div>
-            </div>
+            </button>
           </article>
           {childrenOf(root.id).map((child) => (
             <article key={child.id} className="git" style={{ paddingLeft: 32 }}>
-              <div className="git__main">
+              <button
+                type="button"
+                className="git__main"
+                style={{ background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', padding: 0 }}
+                onClick={() => setOpenCategoryId(child.id)}
+              >
                 <div className="git__name" style={{ fontWeight: 500, color: 'var(--ink-2)' }}>
                   {child.name}
                 </div>
-              </div>
+              </button>
             </article>
           ))}
         </div>
       ))}
+
+      {openCategoryId ? (
+        <CategoryDetailScreen categoryId={openCategoryId} onClose={() => setOpenCategoryId(null)} />
+      ) : null}
     </div>
   );
 };

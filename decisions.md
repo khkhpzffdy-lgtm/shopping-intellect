@@ -617,12 +617,21 @@ connection to list-adding." Closed as follows:
   — it remains true that no one ever browses a stranger's terms; "no global
   catalog" meant "no shared catalog of everyone's products," which still holds.
 - [x] **Archiving from Catalog while the record is still on an active list is
-  blocked** (recommended by the owner) — the archive action is disabled/shows
-  why, with a prompt to remove it from its list(s) first (the existing
-  `onRemoveItem` / `§2.6` list-delete affordances already cover that). This
-  mirrors the existing `RESTRICT` FK behaviour (`list_items.user_product_id`/
-  `store_product_id` → `ON DELETE RESTRICT`, `04` §4.3) at the UX layer instead
-  of surfacing a raw DB error.
+  blocked** (recommended by the owner) — implemented reactively: the archive
+  action is always tappable, the server rejects with 409 `in_use` if an active
+  `list_items` row still references it, and the UI shows that message inline
+  with a prompt to remove it from its list(s) first (the existing
+  `onRemoveItem` / `§2.6` list-delete affordances already cover that), rather
+  than proactively graying out the button in advance. **Amended 2026-06-21
+  (§4.0d build) from "disabled" to "reactive"** — a proactive disable would
+  require `GET /categories/{id}/products` to additionally compute and return
+  an in-use flag per row (a join against `list_items` for every record shown),
+  which is a bigger response-shape and query change for the same end result
+  (archiving an in-use record is blocked either way); reactive ships in this
+  slice's budget, proactive can follow later if the UX gap is felt in practice.
+  This still mirrors the existing `RESTRICT` FK behaviour
+  (`list_items.user_product_id`/`store_product_id` → `ON DELETE RESTRICT`,
+  `04` §4.3) at the application layer instead of surfacing a raw DB error.
 - [x] **StoreProduct gains an `is_archived` flag**, mirroring `user_products.is_archived`
   (`04` §4.3) — needed now that StoreProduct rows are independently manageable
   from Catalog, not just attached to a list. Same soft-delete rationale: history

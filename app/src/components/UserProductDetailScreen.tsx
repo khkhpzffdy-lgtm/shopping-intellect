@@ -5,12 +5,15 @@ import { HeartFilledIcon, HeartOutlineIcon } from './icons';
 import type { ListItemView, UserProductRecord } from '../storage/db';
 
 type UserProductDetailScreenProps = {
-  item: ListItemView;
+  // Absent when opened standalone from Catalog rather than from a list item
+  // — quantity/unit live on the list_item, not the term, so that section
+  // simply doesn't render in that case.
+  item?: ListItemView;
   userProduct: UserProductRecord;
   onRename: (newTerm: string) => Promise<{ ok: boolean; error?: string }>;
   onSetFavorite: (isFavorite: boolean) => void;
   onSetCategories: (categoryIds: string[]) => void;
-  onUpdateItem: (patch: { quantity?: number; unit?: string }) => void;
+  onUpdateItem?: (patch: { quantity?: number; unit?: string }) => void;
 };
 
 const ITEM_EMOJI = '🛒';
@@ -26,7 +29,7 @@ export const UserProductDetailScreen = ({
   const [termDraft, setTermDraft] = useState(userProduct.term);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [categories, setCategories] = useState<CategoryDto[]>([]);
-  const [unitDraft, setUnitDraft] = useState(item.unit);
+  const [unitDraft, setUnitDraft] = useState(item?.unit ?? '');
   const [pickerOpen, setPickerOpen] = useState(false);
 
   // Resets the draft whenever the parent confirms a rename — either our own
@@ -36,8 +39,8 @@ export const UserProductDetailScreen = ({
   }, [userProduct.term]);
 
   useEffect(() => {
-    setUnitDraft(item.unit);
-  }, [item.unit]);
+    setUnitDraft(item?.unit ?? '');
+  }, [item?.unit]);
 
   useEffect(() => {
     let active = true;
@@ -69,6 +72,7 @@ export const UserProductDetailScreen = ({
   };
 
   const commitUnit = () => {
+    if (!item || !onUpdateItem) return;
     const trimmedUnit = unitDraft.trim();
     if (trimmedUnit && trimmedUnit !== item.unit) {
       onUpdateItem({ unit: trimmedUnit });
@@ -151,44 +155,46 @@ export const UserProductDetailScreen = ({
         </p>
       ) : null}
 
-      <div className="group">
-        <div className="group__head">
-          <span className="group__title">Количество</span>
-        </div>
-        <div className="qtygrid">
-          <div className="qtygrid__cell">
-            <div className="qtygrid__label">Брой</div>
-            <div className="stepper">
-              <button
-                type="button"
-                aria-label="Намали количеството"
-                disabled={item.quantity <= 1}
-                onClick={() => onUpdateItem({ quantity: item.quantity - 1 })}
-              >
-                −
-              </button>
-              <span className="stepper__v">{item.quantity}</span>
-              <button
-                type="button"
-                aria-label="Увеличи количеството"
-                onClick={() => onUpdateItem({ quantity: item.quantity + 1 })}
-              >
-                +
-              </button>
+      {item && onUpdateItem ? (
+        <div className="group">
+          <div className="group__head">
+            <span className="group__title">Количество</span>
+          </div>
+          <div className="qtygrid">
+            <div className="qtygrid__cell">
+              <div className="qtygrid__label">Брой</div>
+              <div className="stepper">
+                <button
+                  type="button"
+                  aria-label="Намали количеството"
+                  disabled={item.quantity <= 1}
+                  onClick={() => onUpdateItem({ quantity: item.quantity - 1 })}
+                >
+                  −
+                </button>
+                <span className="stepper__v">{item.quantity}</span>
+                <button
+                  type="button"
+                  aria-label="Увеличи количеството"
+                  onClick={() => onUpdateItem({ quantity: item.quantity + 1 })}
+                >
+                  +
+                </button>
+              </div>
+            </div>
+            <div className="qtygrid__cell">
+              <div className="qtygrid__label">Мярка</div>
+              <input
+                aria-label="Мярка"
+                className="qtygrid__val"
+                value={unitDraft}
+                onChange={(event) => setUnitDraft(event.target.value)}
+                onBlur={commitUnit}
+              />
             </div>
           </div>
-          <div className="qtygrid__cell">
-            <div className="qtygrid__label">Мярка</div>
-            <input
-              aria-label="Мярка"
-              className="qtygrid__val"
-              value={unitDraft}
-              onChange={(event) => setUnitDraft(event.target.value)}
-              onBlur={commitUnit}
-            />
-          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 };

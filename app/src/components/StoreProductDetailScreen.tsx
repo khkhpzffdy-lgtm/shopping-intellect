@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import type { ListItemView, StoreProductRecord } from '../storage/db';
 
 type StoreProductDetailScreenProps = {
-  item: ListItemView;
+  // Absent when opened standalone from Catalog rather than from a list item.
+  item?: ListItemView;
   storeProduct: StoreProductRecord;
   canEdit: boolean;
   onRename: (newName: string) => Promise<{ ok: boolean; error?: string }>;

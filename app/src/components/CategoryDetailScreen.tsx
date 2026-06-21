@@ -243,7 +243,7 @@ export const CategoryDetailScreen = ({ categoryId, onClose }: CategoryDetailScre
   return (
     <div
       data-testid="category-detail"
-      style={{ position: 'fixed', inset: 0, background: 'var(--bg)', zIndex: 50, overflowY: 'auto' }}
+      style={{ position: 'fixed', inset: 0, background: 'var(--bg)', zIndex: 110, overflowY: 'auto' }}
       className="px-4 py-6 md:px-8"
     >
       <div className="mx-auto max-w-3xl space-y-4">
@@ -447,7 +447,7 @@ export const CategoryDetailScreen = ({ categoryId, onClose }: CategoryDetailScre
       </div>
 
       {detailUserProduct ? (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--bg)', zIndex: 60, overflowY: 'auto' }} className="px-4 py-6 md:px-8">
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--bg)', zIndex: 120, overflowY: 'auto' }} className="px-4 py-6 md:px-8">
           <div className="mx-auto max-w-3xl space-y-4">
             <div className="appbar">
               <button type="button" onClick={() => setDetailUserProduct(null)} className="iconbtn" aria-label="Затвори">
@@ -507,7 +507,7 @@ export const CategoryDetailScreen = ({ categoryId, onClose }: CategoryDetailScre
       ) : null}
 
       {detailStoreProduct ? (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--bg)', zIndex: 60, overflowY: 'auto' }} className="px-4 py-6 md:px-8">
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--bg)', zIndex: 120, overflowY: 'auto' }} className="px-4 py-6 md:px-8">
           <div className="mx-auto max-w-3xl space-y-4">
             <div className="appbar">
               <button type="button" onClick={() => setDetailStoreProduct(null)} className="iconbtn" aria-label="Затвори">

@@ -61,3 +61,23 @@ export const EditIcon = () => (
     />
   </svg>
 );
+
+export const HeartFilledIcon = () => (
+  <svg viewBox="0 0 24 24">
+    <path
+      d="M12 21s-7.5-4.7-10-9.3C.5 8.4 2 4.8 5.4 4.8c2 0 3.3 1.1 4.1 2.3l.5.8.5-.8c.8-1.2 2.1-2.3 4.1-2.3 3.4 0 4.9 3.6 3.4 6.9C19.5 16.3 12 21 12 21z"
+      fill="var(--accent)"
+    />
+  </svg>
+);
+
+export const HeartOutlineIcon = () => (
+  <svg viewBox="0 0 24 24">
+    <path
+      d="M12 20s-6.8-4.3-9.1-8.5C1.5 8.6 2.8 5.8 5.6 5.8c1.8 0 3 1 3.8 2.1l.6.9.6-.9c.8-1.1 2-2.1 3.8-2.1 2.8 0 4.1 2.8 2.7 5.7C18.8 15.7 12 20 12 20z"
+      fill="none"
+      stroke="var(--ink-3)"
+      strokeWidth="1.7"
+    />
+  </svg>
+);

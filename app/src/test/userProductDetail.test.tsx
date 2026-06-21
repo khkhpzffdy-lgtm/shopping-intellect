@@ -101,28 +101,27 @@ describe('UserProductDetailScreen', () => {
     expect(screen.getByLabelText('Добави в любими')).toBeInTheDocument();
   });
 
-  test('Save is disabled when the term is blank or unchanged', async () => {
+  test('blank rename is a no-op (reverts to the current term, no onRename call)', async () => {
+    const onRename = vi.fn(async () => ({ ok: true }));
     render(
       <UserProductDetailScreen
         item={baseItem}
         userProduct={baseUserProduct}
-        onRename={async () => ({ ok: true })}
+        onRename={onRename}
         onSetFavorite={() => {}}
         onUpdateItem={() => {}}
       />
     );
 
     const input = screen.getByLabelText('Термин');
-    expect(screen.getByText('Запази')).toBeDisabled();
-
     await userEvent.clear(input);
-    expect(screen.getByText('Запази')).toBeDisabled();
+    await userEvent.tab();
 
-    await userEvent.type(input, 'прясно мляко');
-    expect(screen.getByText('Запази')).not.toBeDisabled();
+    expect(onRename).not.toHaveBeenCalled();
+    expect(input).toHaveValue('мляко');
   });
 
-  test('save persists the rename to IndexedDB', async () => {
+  test('rename persists to IndexedDB on blur', async () => {
     await putUserProduct(baseUserProduct);
 
     render(
@@ -138,7 +137,7 @@ describe('UserProductDetailScreen', () => {
     const input = screen.getByLabelText('Термин');
     await userEvent.clear(input);
     await userEvent.type(input, 'прясно мляко');
-    await userEvent.click(screen.getByText('Запази'));
+    await userEvent.tab();
 
     await waitFor(async () => {
       const stored = await getUserProduct('up-1');
@@ -163,7 +162,7 @@ describe('UserProductDetailScreen', () => {
     const input = screen.getByLabelText('Термин');
     await userEvent.clear(input);
     await userEvent.type(input, 'био мляко');
-    await userEvent.click(screen.getByText('Запази'));
+    await userEvent.tab();
 
     await waitFor(async () => {
       const queued = await getQueuedMutations(['pending', 'failed']);
@@ -188,7 +187,7 @@ describe('UserProductDetailScreen', () => {
     expect(screen.getByLabelText('Термин')).toBeDisabled();
   });
 
-  test('quantity edit calls onUpdateItem on blur', async () => {
+  test('quantity stepper calls onUpdateItem with the incremented/decremented value', async () => {
     const onUpdateItem = vi.fn();
     render(
       <UserProductDetailScreen
@@ -200,11 +199,46 @@ describe('UserProductDetailScreen', () => {
       />
     );
 
-    const quantityInput = screen.getByLabelText('Количество');
-    await userEvent.clear(quantityInput);
-    await userEvent.type(quantityInput, '5');
+    await userEvent.click(screen.getByLabelText('Увеличи количеството'));
+    expect(onUpdateItem).toHaveBeenCalledWith({ quantity: 3 });
+
+    await userEvent.click(screen.getByLabelText('Намали количеството'));
+    expect(onUpdateItem).toHaveBeenCalledWith({ quantity: 1 });
+  });
+
+  test('quantity stepper cannot go below 1', async () => {
+    const onUpdateItem = vi.fn();
+    render(
+      <UserProductDetailScreen
+        item={{ ...baseItem, quantity: 1 }}
+        userProduct={baseUserProduct}
+        onRename={async () => ({ ok: true })}
+        onSetFavorite={() => {}}
+        onUpdateItem={onUpdateItem}
+      />
+    );
+
+    expect(await screen.findByText('Млечни')).toBeInTheDocument();
+    expect(screen.getByLabelText('Намали количеството')).toBeDisabled();
+  });
+
+  test('unit edit calls onUpdateItem on blur', async () => {
+    const onUpdateItem = vi.fn();
+    render(
+      <UserProductDetailScreen
+        item={baseItem}
+        userProduct={baseUserProduct}
+        onRename={async () => ({ ok: true })}
+        onSetFavorite={() => {}}
+        onUpdateItem={onUpdateItem}
+      />
+    );
+
+    const unitInput = screen.getByLabelText('Мярка');
+    await userEvent.clear(unitInput);
+    await userEvent.type(unitInput, 'кг');
     await userEvent.tab();
 
-    expect(onUpdateItem).toHaveBeenCalledWith({ quantity: 5 });
+    expect(onUpdateItem).toHaveBeenCalledWith({ unit: 'кг' });
   });
 });

@@ -766,7 +766,7 @@ export const HomeScreen = () => {
               >
                 ←
               </button>
-              <div className="appbar__title">{detailUserProduct.term}</div>
+              <div className="appbar__title">Продукт</div>
             </div>
             <UserProductDetailScreen
               item={itemDetailItem}

@@ -971,6 +971,44 @@ Both verified the same way as every other fix today: written, reverted via
 this) + a new case in `itemDetailOpen.test.tsx` ("shows бр. instead of ... piece").
 Pushed to `main`.
 
+**§2.8a visual restyle (2026-06-21): UserProductDetailScreen rebuilt to match
+`design/screens2.jsx`'s `DetailScreen()`.** The Owner pointed out the shipped screen
+didn't match the actual design reference at all and shared new mockups
+(hero+emoji+heart, category as a chip, quantity as a stepper) alongside ones
+introducing real new functionality (Приоритет, Магазин-per-item, "Напомни ми", a
+История tab) that have **no backing anywhere** in `04-database.md`/`decisions.md`/
+`13-implementation-line.md` — confirmed by checking the schema and `design/screens2.jsx`
+directly rather than assuming. Per the Owner's explicit choice, scope for *this* fix was
+restyling the four fields the screen already has — **not** adding the unschemaed ones
+(those need a `decisions.md` entry first, not a screenshot-driven schema invention).
+Changes:
+- New `.hero`/`.hero__emoji`/`.hero__title`/`.hero__fav`/`.hero__row`/`.catchip`/
+  `.group`/`.qtygrid`/`.stepper` classes ported from `design/app.css` into
+  `list-screens.css` (`.si-root`-scoped, matching the existing porting convention from
+  `§2.2c`). Added `HeartFilledIcon`/`HeartOutlineIcon` to `icons.tsx`. The mockup's
+  category chip has a chevron implying a dropdown — skipped it deliberately, since
+  category editing isn't built; the chip stays read-only, no fake affordance.
+- `UserProductDetailScreen.tsx` rebuilt: term is now a permanently-editable, borderless
+  input inside the hero (auto-commits on blur, no separate "Запази" button — matches
+  this codebase's existing `RenameableTitle`/`handleRenameList` blur-commit convention
+  rather than reusing `RenameableTitle` itself, since its input's `aria-label` is
+  hardcoded to `"List name"` and several `App.test.tsx` rename tests already key off
+  that exact string — reusing it here would've meant either an aria-label collision risk
+  or an unrelated `RenameableTitle` refactor; out of scope for a visual restyle).
+  Favorite is now a real heart icon, not literal `♥`/`♡` text. Quantity is now a
+  `−`/`+` stepper (disabled at 1, no more a free-text quantity field). Unit stays an
+  editable text input (styled to match `.qtygrid__val`) — intentionally not a real
+  dropdown, since there's no closed list of valid units anywhere in the schema.
+- `HomeScreen.tsx`'s overlay app bar title changed from the item's term to the generic
+  "Продукт" (matches `screens2.jsx`'s `appbar__center`), since the hero now shows the
+  term itself.
+- Rewrote the now-stale interaction-specific tests in `userProductDetail.test.tsx`
+  (Save-button tests → blur-commit tests; quantity-input test → stepper-click tests;
+  added a unit-blur test) — 8 tests, all passing, plus `itemDetailOpen.test.tsx`'s 3
+  unchanged. Full non-flaky suite (12 files, 57 tests) green, `tsc -b` + `vite build`
+  clean. `App.test.tsx` still has its pre-existing, unrelated 10s-hook-timeout failures
+  (confirmed via `git stash` to predate this entire session).
+
 **2026-06-17 production incident — sync pipeline, four stacked bugs.** Every list/item was stuck
 `sync-pending` forever. Root-caused and fixed live (outside the normal Slice flow, by explicit
 Owner direction, since it was actively breaking production):

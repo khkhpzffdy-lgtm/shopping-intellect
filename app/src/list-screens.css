@@ -218,3 +218,52 @@
 .si-root .sync-icon svg { width: 18px; height: 18px; }
 .si-root .sync-icon--pending { color: var(--promo); }
 .si-root .sync-icon--failed { color: var(--danger); }
+
+/* ---- Product detail (§2.8a restyle, ported from design/app.css) ---- */
+.si-root .hero {
+  margin: 4px 0 0; padding: 24px 16px 20px; border-radius: 24px;
+  background: radial-gradient(120% 120% at 50% 0%, var(--accent-tint) 0%, var(--card) 72%);
+  border: 1px solid var(--card-border);
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.si-root .hero__emoji { font-size: 80px; line-height: 1; }
+.si-root .hero__title { font-size: var(--fs-display); font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 12px; }
+.si-root .hero__name { font-size: inherit; font-weight: inherit; }
+.si-root input.hero__name {
+  border: none; background: transparent; outline: none; text-align: center;
+  color: var(--ink); font-family: inherit; padding: 0; min-width: 0;
+  font-size: inherit; font-weight: inherit;
+}
+.si-root .hero__fav { background: none; border: none; cursor: pointer; display: flex; }
+.si-root .hero__fav:disabled { cursor: default; opacity: .4; }
+.si-root .hero__fav svg { width: 26px; height: 26px; }
+.si-root .hero__row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.si-root .catchip {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 13px; border-radius: 999px;
+  background: var(--chip-bg); color: var(--chip-text);
+  font-size: var(--fs-sm); font-weight: 600; border: none;
+}
+.si-root .catchip svg { width: 14px; height: 14px; }
+
+.si-root .group { margin: 14px 0 0; background: var(--card); border-radius: 18px; overflow: hidden; border: 1px solid var(--card-border); }
+.si-root .group__head { padding: 13px 16px 4px; }
+.si-root .group__title { font-size: var(--fs-xs); font-weight: 700; color: var(--ink-2); letter-spacing: 0.3px; text-transform: uppercase; }
+.si-root .qtygrid { display: flex; }
+.si-root .qtygrid__cell { flex: 1; padding: 8px 16px 16px; }
+.si-root .qtygrid__cell + .qtygrid__cell { border-left: 1px solid var(--line); }
+.si-root .qtygrid__label { font-size: var(--fs-xs); color: var(--ink-2); font-weight: 600; margin-bottom: 8px; }
+.si-root .qtygrid__val {
+  font-size: var(--fs-h2); font-weight: 700; display: flex; align-items: center; justify-content: space-between;
+  background: none; border: none; color: var(--ink); font-family: inherit; width: 100%; padding: 0; text-align: left;
+}
+.si-root .qtygrid__val:disabled { color: var(--ink-3); cursor: default; }
+.si-root .stepper { display: flex; align-items: center; gap: 14px; }
+.si-root .stepper button {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--line-2); background: var(--card-2);
+  color: var(--ink); font-size: 17px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.si-root .stepper button:disabled { opacity: .4; cursor: default; }
+.si-root .stepper__v { font-size: var(--fs-h2); font-weight: 700; font-variant-numeric: tabular-nums; min-width: 22px; text-align: center; }

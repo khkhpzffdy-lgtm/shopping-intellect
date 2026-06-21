@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiRequest } from '../api/client';
+import { HeartFilledIcon, HeartOutlineIcon } from './icons';
 import type { ListItemView, UserProductRecord } from '../storage/db';
 
 type CategoryDto = {
@@ -15,6 +16,8 @@ type UserProductDetailScreenProps = {
   onUpdateItem: (patch: { quantity?: number; unit?: string }) => void;
 };
 
+const ITEM_EMOJI = '🛒';
+
 export const UserProductDetailScreen = ({
   item,
   userProduct,
@@ -24,21 +27,18 @@ export const UserProductDetailScreen = ({
 }: UserProductDetailScreenProps) => {
   const [termDraft, setTermDraft] = useState(userProduct.term);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState<CategoryDto[]>([]);
-  const [quantityDraft, setQuantityDraft] = useState(String(item.quantity));
   const [unitDraft, setUnitDraft] = useState(item.unit);
 
-  // Resets the draft (and re-disables Save) whenever the parent confirms a
-  // rename — either our own save, or this term changing under us.
+  // Resets the draft whenever the parent confirms a rename — either our own
+  // save, or this term changing under us.
   useEffect(() => {
     setTermDraft(userProduct.term);
   }, [userProduct.term]);
 
   useEffect(() => {
-    setQuantityDraft(String(item.quantity));
     setUnitDraft(item.unit);
-  }, [item.quantity, item.unit]);
+  }, [item.unit]);
 
   useEffect(() => {
     let active = true;
@@ -55,36 +55,26 @@ export const UserProductDetailScreen = ({
   }, []);
 
   const isSystemOwned = userProduct.owner_type === 'system';
-  const trimmedTerm = termDraft.trim();
-  const canSaveTerm = !isSystemOwned && !saving && trimmedTerm !== '' && trimmedTerm !== userProduct.term;
 
-  const handleSaveTerm = async () => {
-    setSaving(true);
+  const commitTerm = async () => {
+    const trimmed = termDraft.trim();
+    if (!trimmed || trimmed === userProduct.term) {
+      setTermDraft(userProduct.term);
+      return;
+    }
     setErrorMessage(null);
-    try {
-      const result = await onRename(trimmedTerm);
-      if (!result.ok) {
-        setErrorMessage(result.error ?? 'Преименуването е неуспешно.');
-      }
-    } finally {
-      setSaving(false);
+    const result = await onRename(trimmed);
+    if (!result.ok) {
+      setErrorMessage(result.error ?? 'Преименуването е неуспешно.');
     }
   };
 
-  const commitQuantityUnit = () => {
-    const quantity = Number(quantityDraft);
+  const commitUnit = () => {
     const trimmedUnit = unitDraft.trim();
-    const patch: { quantity?: number; unit?: string } = {};
-
-    if (!Number.isNaN(quantity) && quantity > 0 && quantity !== item.quantity) {
-      patch.quantity = quantity;
-    }
     if (trimmedUnit && trimmedUnit !== item.unit) {
-      patch.unit = trimmedUnit;
-    }
-
-    if (Object.keys(patch).length > 0) {
-      onUpdateItem(patch);
+      onUpdateItem({ unit: trimmedUnit });
+    } else {
+      setUnitDraft(item.unit);
     }
   };
 
@@ -94,66 +84,84 @@ export const UserProductDetailScreen = ({
 
   return (
     <div className="addsearch" data-testid="user-product-detail">
-      <div className="addbar">
-        <input
-          aria-label="Термин"
-          value={termDraft}
-          onChange={(event) => setTermDraft(event.target.value)}
-          disabled={isSystemOwned}
-          className="addbar__field"
-        />
-        <button
-          type="button"
-          onClick={() => void handleSaveTerm()}
-          disabled={!canSaveTerm}
-          className="iconbtn"
-        >
-          Запази
-        </button>
-        <button
-          type="button"
-          aria-pressed={Boolean(userProduct.is_favorite)}
-          aria-label={userProduct.is_favorite ? 'Премахни от любими' : 'Добави в любими'}
-          disabled={isSystemOwned}
-          onClick={() => onSetFavorite(!userProduct.is_favorite)}
-          className="iconbtn"
-        >
-          {userProduct.is_favorite ? '♥' : '♡'}
-        </button>
+      <div className="hero">
+        <span className="hero__emoji" aria-hidden="true">
+          {ITEM_EMOJI}
+        </span>
+        <div className="hero__title">
+          <input
+            aria-label="Термин"
+            className="hero__name"
+            value={termDraft}
+            onChange={(event) => setTermDraft(event.target.value)}
+            onBlur={() => void commitTerm()}
+            disabled={isSystemOwned}
+          />
+          <button
+            type="button"
+            className="hero__fav"
+            aria-pressed={Boolean(userProduct.is_favorite)}
+            aria-label={userProduct.is_favorite ? 'Премахни от любими' : 'Добави в любими'}
+            disabled={isSystemOwned}
+            onClick={() => onSetFavorite(!userProduct.is_favorite)}
+          >
+            {userProduct.is_favorite ? <HeartFilledIcon /> : <HeartOutlineIcon />}
+          </button>
+        </div>
+        {categoryNames.length > 0 ? (
+          <div className="hero__row">
+            {categoryNames.map((name) => (
+              <span key={name} className="catchip">
+                {name}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {errorMessage ? (
-        <p role="alert" style={{ color: 'var(--danger)', fontSize: 'var(--fs-sm)' }}>
+        <p role="alert" style={{ color: 'var(--danger)', fontSize: 'var(--fs-sm)', textAlign: 'center', marginTop: 8 }}>
           {errorMessage}
         </p>
       ) : null}
 
-      {categoryNames.length > 0 ? (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {categoryNames.map((name) => (
-            <span key={name} className="git" style={{ padding: '4px 10px' }}>
-              {name}
-            </span>
-          ))}
+      <div className="group">
+        <div className="group__head">
+          <span className="group__title">Количество</span>
         </div>
-      ) : null}
-
-      <div className="addbar">
-        <input
-          aria-label="Количество"
-          value={quantityDraft}
-          onChange={(event) => setQuantityDraft(event.target.value)}
-          onBlur={commitQuantityUnit}
-          className="addbar__field"
-          style={{ flex: '0 0 64px' }}
-        />
-        <input
-          aria-label="Мерна единица"
-          value={unitDraft}
-          onChange={(event) => setUnitDraft(event.target.value)}
-          onBlur={commitQuantityUnit}
-          className="addbar__field"
-        />
+        <div className="qtygrid">
+          <div className="qtygrid__cell">
+            <div className="qtygrid__label">Брой</div>
+            <div className="stepper">
+              <button
+                type="button"
+                aria-label="Намали количеството"
+                disabled={item.quantity <= 1}
+                onClick={() => onUpdateItem({ quantity: item.quantity - 1 })}
+              >
+                −
+              </button>
+              <span className="stepper__v">{item.quantity}</span>
+              <button
+                type="button"
+                aria-label="Увеличи количеството"
+                onClick={() => onUpdateItem({ quantity: item.quantity + 1 })}
+              >
+                +
+              </button>
+            </div>
+          </div>
+          <div className="qtygrid__cell">
+            <div className="qtygrid__label">Мярка</div>
+            <input
+              aria-label="Мярка"
+              className="qtygrid__val"
+              value={unitDraft}
+              onChange={(event) => setUnitDraft(event.target.value)}
+              onBlur={commitUnit}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

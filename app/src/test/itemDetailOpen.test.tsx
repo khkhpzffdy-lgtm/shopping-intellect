@@ -105,3 +105,29 @@ describe('opening an item detail screen when the local UserProduct cache missed 
     expect(screen.queryByTestId('user-product-detail')).not.toBeInTheDocument();
   });
 });
+
+describe('list row unit display', () => {
+  test('shows бр. instead of the internal English default "piece"', async () => {
+    mockedApiRequest.mockResolvedValue({ user_products: [] });
+    await putListItem({
+      client_uuid: 'item-2',
+      id: '901',
+      list_client_uuid: 'list-1',
+      list_id: '42',
+      user_product_client_uuid: 'up-2',
+      user_product_id: '56',
+      quantity: 3,
+      unit: 'piece',
+      is_checked: false,
+      created_at: '2026-06-20T09:00:01.000Z',
+      updated_at: '2026-06-20T09:00:01.000Z'
+    });
+
+    render(<HomeScreen />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Отвори Тест' }));
+
+    expect(await screen.findByText('3 бр.')).toBeInTheDocument();
+    expect(screen.queryByText(/piece/)).not.toBeInTheDocument();
+  });
+});

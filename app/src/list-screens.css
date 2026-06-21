@@ -23,6 +23,8 @@
 }
 .si-root .iconbtn:active { background: var(--input); }
 .si-root .iconbtn svg { width: 20px; height: 20px; flex-shrink: 0; }
+.si-root .iconbtn:disabled { opacity: .4; cursor: default; }
+.si-root .addbar__field:disabled { opacity: .5; cursor: default; }
 
 .si-root .modeseg { display: inline-flex; padding: 3px; gap: 2px; background: var(--input); border-radius: 999px; }
 .si-root .modeseg__opt {

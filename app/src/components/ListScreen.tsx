@@ -25,6 +25,13 @@ type ListScreenProps = {
 
 const ITEM_EMOJI = '🛒';
 
+// 'piece' is the internal default unit value (frontend draft fallback and
+// the backend's own column default, ListService::createItem()) — an
+// English literal never meant to be user-facing. Translate only that one
+// known value for display; any other unit is free text the user typed
+// themselves (кг, л, бр., ...) and must pass through unchanged.
+const displayUnit = (unit: string) => (unit === 'piece' ? 'бр.' : unit);
+
 export const ListScreen = ({
   list,
   items,
@@ -139,14 +146,14 @@ export const ListScreen = ({
                 >
                   <div className="git__name">{item.term}</div>
                   <div className="git__sub">
-                    {item.quantity} {item.unit}
+                    {item.quantity} {displayUnit(item.unit)}
                   </div>
                 </button>
               ) : (
                 <div className="git__main">
                   <div className="git__name">{item.term}</div>
                   <div className="git__sub">
-                    {item.quantity} {item.unit}
+                    {item.quantity} {displayUnit(item.unit)}
                   </div>
                 </div>
               )}
@@ -179,7 +186,7 @@ export const ListScreen = ({
                   <div className="git__name">{item.term}</div>
                 </div>
                 <span className="git__qty">
-                  {item.quantity} {item.unit}
+                  {item.quantity} {displayUnit(item.unit)}
                 </span>
               </button>
               <SyncStatusIndicator

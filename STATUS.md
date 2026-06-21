@@ -942,6 +942,35 @@ only `tsc -b && vite build` — so a broken test file (like this one was, univer
 for months) can never block a deploy; nothing today gates merges on the Vitest suite
 passing. Worth a future slice. Pushed to `main`.
 
+**§2.8a fix #4 (2026-06-21): Owner screenshot of the "Домати" detail screen raised
+"is this what we have?" — investigated rather than assumed.** Wrote a throwaway probe
+test reproducing the screenshot's exact real-world precondition (a `system`-owned seeded
+term whose local `user_products` cache already has the *full, correct* shape — proven
+by the fact the screenshot's "Зеленчуци" category badge rendered at all, since
+`mergeServerListItem()`'s placeholder write never sets `category_ids`, only a full
+`GET /user-products` response does). Result: `term`/`is_favorite` **were already
+genuinely disabled** under the hood (`disabled` attribute confirmed `true` for all
+three controls) — the system-row protection works. The real, confirmed bugs were two
+separate UI/display gaps, not a permissions bug:
+1. **Disabled controls were visually indistinguishable from enabled ones** —
+   `.iconbtn`/`.addbar__field` had no `:disabled` styling anywhere in `list-screens.css`,
+   so a correctly-blocked Save/♥/input looked exactly as tappable as a working one.
+   Added `opacity: .4`/`.5` + `cursor: default` for both classes' `:disabled` state.
+2. **The internal default unit value `'piece'` (English) rendered verbatim** in list
+   rows — it's a real default on both sides (`ListService::createItem()`'s PHP fallback
+   *and* the `oCk_si_list_items.unit` column's own `DEFAULT 'piece'`), so the stored
+   value itself was deliberately left alone (a data/schema decision, not mine to make
+   unilaterally) — only the **read-only display** in `ListScreen.tsx`'s two item rows
+   now maps `'piece'` → `'бр.'` via a small `displayUnit()` helper. The detail screen's
+   quantity/unit *inputs* are intentionally left untranslated (translating an editable
+   field's initial value would make `commitQuantityUnit()`'s "did the user actually
+   change anything" comparison misfire and send a spurious PATCH on open).
+Both verified the same way as every other fix today: written, reverted via
+`git stash`, confirmed failing on the old code, restored. New tests:
+`userProductDetail.test.tsx`'s existing disabled-state test (unchanged, already covered
+this) + a new case in `itemDetailOpen.test.tsx` ("shows бр. instead of ... piece").
+Pushed to `main`.
+
 **2026-06-17 production incident — sync pipeline, four stacked bugs.** Every list/item was stuck
 `sync-pending` forever. Root-caused and fixed live (outside the normal Slice flow, by explicit
 Owner direction, since it was actively breaking production):

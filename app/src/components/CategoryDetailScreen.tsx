@@ -10,6 +10,7 @@ import {
   type UserProductRecord
 } from '../storage/db';
 import { sendMutation } from '../sync/sendMutation';
+import { useBackHandler } from '../hooks/useBackHandler';
 import { generateUuid } from '../utils/uuid';
 import { StoreProductDetailScreen } from './StoreProductDetailScreen';
 import { UserProductDetailScreen } from './UserProductDetailScreen';
@@ -58,6 +59,14 @@ export const CategoryDetailScreen = ({ categoryId, onClose }: CategoryDetailScre
   >(null);
   const [lists, setLists] = useState<ServerListDto[] | null>(null);
   const [addingToList, setAddingToList] = useState(false);
+
+  // This instance is always itself an "open screen" (a category root, or one
+  // level of drill-down — see the recursive render at the bottom), so a
+  // back-gesture closes it via onClose; the two detail overlays nested
+  // inside it get their own entries on top when open.
+  useBackHandler(true, onClose);
+  useBackHandler(detailUserProduct !== null, () => setDetailUserProduct(null));
+  useBackHandler(detailStoreProduct !== null, () => setDetailStoreProduct(null));
 
   const load = async () => {
     setStatus('loading');

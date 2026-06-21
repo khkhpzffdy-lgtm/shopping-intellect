@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiRequest } from '../api/client';
+import { useBackHandler } from '../hooks/useBackHandler';
 import { CategoryDetailScreen } from './CategoryDetailScreen';
 import { SkeletonLoader } from './SkeletonLoader';
 
@@ -18,6 +19,8 @@ export const CatalogScreen = ({ isActive = true }: CatalogScreenProps) => {
   const [categories, setCategories] = useState<CategoryDto[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [openCategoryId, setOpenCategoryId] = useState<string | null>(null);
+
+  useBackHandler(openCategoryId !== null, () => setOpenCategoryId(null));
 
   useEffect(() => {
     if (!isActive) return;

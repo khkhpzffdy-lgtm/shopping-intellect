@@ -38,6 +38,7 @@ import { ListScreen } from './ListScreen';
 import { StoreProductDetailScreen } from './StoreProductDetailScreen';
 import { UserProductDetailScreen } from './UserProductDetailScreen';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useBackHandler } from '../hooks/useBackHandler';
 import { generateUuid } from '../utils/uuid';
 
 const formatActionError = (error: unknown, fallback: string) => {
@@ -97,6 +98,17 @@ export const HomeScreen = () => {
     () => items.find((candidate) => candidate.client_uuid === storeProductDetailKey) ?? null,
     [items, storeProductDetailKey]
   );
+
+  // Edge-swipe/hardware back closes the topmost open overlay instead of
+  // falling through to real browser history — see useBackHandler.ts. Order
+  // matters only in that whichever of these mounts last (i.e. opens on top
+  // of an already-open one) pushes its history entry last, so popping it
+  // closes the right one first; the existing close handlers' "only one
+  // overlay open at once" invariant keeps that unambiguous.
+  useBackHandler(selectedListKey !== null, () => setSelectedListKey(null));
+  useBackHandler(addSearchOpen, () => setAddSearchOpen(false));
+  useBackHandler(itemDetailKey !== null, () => handleCloseItemDetail());
+  useBackHandler(storeProductDetailKey !== null, () => handleCloseStoreProductDetail());
 
   const refreshMutationStatusCounts = async () => {
     setMutationStatusCounts(await getMutationStatusCounts());

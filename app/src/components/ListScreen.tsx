@@ -18,6 +18,7 @@ type ListScreenProps = {
   onAddItem: () => void;
   onOpenAddSearch: () => void;
   onOpenItemDetail: (item: ListItemView) => void;
+  onOpenStoreProductDetail: (item: ListItemView) => void;
   onToggleChecked: (item: ListItemView) => void;
   onRemoveItem: (item: ListItemView) => void;
   onRenameList: (name: string) => void;
@@ -43,6 +44,7 @@ export const ListScreen = ({
   onAddItem,
   onOpenAddSearch,
   onOpenItemDetail,
+  onOpenStoreProductDetail,
   onToggleChecked,
   onRemoveItem,
   onRenameList
@@ -142,6 +144,19 @@ export const ListScreen = ({
                   className="git__main"
                   style={{ background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', padding: 0 }}
                   onClick={() => onOpenItemDetail(item)}
+                  data-testid={`item-detail-trigger-${item.client_uuid}`}
+                >
+                  <div className="git__name">{item.term}</div>
+                  <div className="git__sub">
+                    {item.quantity} {displayUnit(item.unit)}
+                  </div>
+                </button>
+              ) : item.store_product_client_uuid ? (
+                <button
+                  type="button"
+                  className="git__main"
+                  style={{ background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', padding: 0 }}
+                  onClick={() => onOpenStoreProductDetail(item)}
                   data-testid={`item-detail-trigger-${item.client_uuid}`}
                 >
                   <div className="git__name">{item.term}</div>

@@ -155,6 +155,7 @@ Categorization is **lenient on purpose.** A debatable offer landing in a roughly
 |Frontend PWA                     |Cloudflare Pages       |€0  |
 |Auth (JWT + Google)              |WP plugins             |€0  |
 |CDN + DDoS                       |Cloudflare free tier   |€0  |
+|StoreProduct metadata extraction |Google Gemini API      |**usage-based, not €0** — added 2026-06-19, see §14 "StoreProduct dedupe + async Gemini metadata extraction"|
 
 ### SuperHosting — confirmed
 
@@ -380,6 +381,53 @@ Recommended Claude settings per document (model: **Opus 4.8** throughout — sam
 - [ ] **Multi-member family dissolve.** `D-2` (resolved below) added member self-leave + admin hand-off + solo-family auto-delete, but an explicit **`DELETE /families/{id}`** (an admin dissolving a family that still has other members) is **not** added — decide whether MVP needs it, or members are removed/leave individually first. (`06` §6.6)
 - [ ] **FLAG — "Recipes" tab vs the MVP exclusion list.** The owner's 2026-06-17 navigation note names a future bottom-nav `Recipes` tab alongside `Offers`. `11-user-flows.md` §"Open for design" (closing notes) currently lists **recipes/meal-plan as a deliberately-excluded MVP surface**. Not reconciled here at the owner's request — **flagged only**; resolve explicitly (either retire the exclusion or drop/rename the future tab) before building a Recipes screen.
 
+### Resolved — StoreProduct edit rights for `source='user'` rows (2026-06-21)
+
+Found while designing §2.8b (StoreProduct detail screen): `source='user'`
+StoreProduct dedupe is global across all users (`findByNormalizedName()`,
+resolved below), but nothing said who may rename/edit a row once two unrelated
+users can share it. The natural-sounding answer — "anyone in the same family
+list can edit it" — doesn't have a foothold in the current code: family-owned
+lists are **not built yet**. `ListService::createList()` rejects any
+`owner_type` other than `'user'` (`ListService.php:39`) and `ownsList()` only
+ever checks `ownerType === 'user' && ownerId === userId` (`ListService.php:268`).
+`family_ids[]` exists on the JWT claim set but nothing in `ListService` uses it
+to gate list access yet. Closed as follows:
+
+- [x] **Edit rights on a `source='user'` StoreProduct are creator-only**,
+  checked against `created_by_user_id` — the same shape as
+  `UserProductService::ownedNonSystemUserProduct()`'s guard, applied to
+  `StoreProductService::rename()`/`setImageUrl()`/`setBarcode()`. This is an
+  interim rule, not a statement that family-shared edit rights are wrong —
+  it's what the data model can actually express today.
+- [x] **A non-creator's edit attempt returns 403 Forbidden** (a new
+  `StoreProductForbiddenException`), mirroring the existing system-row 403 in
+  `UserProductController`. Not a silent no-op, not a fork into a new row.
+- [x] **Family-wide edit rights on shared StoreProducts is deferred until
+  family-owned lists actually exist** — re-open this question when that
+  feature is built; don't build family-membership checks into
+  `StoreProductService` ahead of that.
+
+### Resolved — barcode edit is a true replace, not an accumulate (2026-06-21)
+
+Found while designing §2.8b: the `oCk_si_barcodes` table supports several
+barcode values per `store_product_id` (multipack/variant, Phase 2), which
+made the planned `BarcodeRepositoryInterface` (`attach()` + `valuesFor()`,
+no removal) ambiguous for the single-barcode-field UI this slice builds —
+correcting a typo would silently leave the old value attached alongside the
+new one. Closed as follows:
+
+- [x] **`BarcodeRepositoryInterface` gains a `replace(int $storeProductId,
+  string $value): void`** — deletes any existing values for that
+  `store_product_id` before inserting the new one. The detail screen's single
+  barcode field always calls `replace()`, never `attach()` directly.
+  `attach()` stays on the interface for whenever Phase-2 multipack/variant
+  support actually adds multiple barcodes through a different UI path.
+- [x] **`GET /store-products/{id}` returns a single `barcode` value** (the
+  most recent, i.e. the only one after a `replace()`), not an array — keeps
+  the response shape simple for the v1 single-barcode UI. Revisit when
+  Phase-2 multi-barcode UI lands.
+
 ### Resolved — list_items can target a specific StoreProduct directly (2026-06-18)
 
 The owner wants two equally-valid ways to populate a list: a **broad term**
@@ -423,6 +471,117 @@ represented "under" an artificial UserProduct term. Closed as follows:
   (those persist for reuse/history independent of any one list, consistent
   with `user_products.is_archived` soft-delete already protecting term
   history). (`04` §4.3)
+
+### Resolved — StoreProduct dedupe across users + async Gemini metadata extraction (2026-06-19)
+
+Found during review of §4.0c (manual StoreProduct creation): as built, two different
+users independently typing the same specific item (e.g. "Мляко Олимпус 2% 1л") each get
+their **own** `source='user'` `store_products` row — no cross-user dedupe. This defeats
+the point of StoreProduct being a shared, canonical layer-3 identity (D §4) — once
+crawling/matching (§3.x/§4.x) lands, the system would have to match offers against N
+duplicate rows instead of one. Closed as follows:
+
+- [x] **`StoreProductService::findOrCreate` gains real dedupe: exact `normalized_name`
+  match across ALL users, not scoped to the creating user.** A `source='user'` row is
+  looked up by `normalized_name` (same normalizer shape as `UserProduct`'s — lowercase/
+  trim/whitespace-collapse) before creating a new one; a match returns the existing row
+  instead of duplicating it. This is **literal-text dedupe only** — "Мляко олимпус 2% 1
+  л" and "мляко олимпус 2%, 1л" normalize to the same string and merge; "Олимпус мляко,
+  2%, 1 литър" (different word order/phrasing) does **not** match today and creates a
+  second row. No fuzzy matching and no confirmation dialog are introduced — fuzzy
+  matching-with-confirmation was explicitly considered and rejected because it would
+  reintroduce the "is this the same product? yes/no" UX the matching-by-selection
+  principle (D §4) deliberately avoids everywhere else.
+- [x] **Asynchronously, after creation, a background job calls the Gemini API to extract
+  structured metadata from the free-text name**: `brand_normalized` (e.g. "Олимпус"),
+  a quantity/size value (e.g. "1л" — new column, not yet named/typed in this resolution,
+  defer the exact representation to the slice that builds it), a percent/variant
+  attribute (e.g. "2%" — new column), and a best-guess parent category/bucket link
+  (written into the `product_categories` junction table from §4.0e, not a new column).
+  **Asynchronous and non-blocking**: adding an item to a list never waits on Gemini —
+  the StoreProduct row is created and usable immediately with just its typed name; the
+  extracted fields fill in later (the item detail screen, §2.8, should be able to show
+  "enriching…" or simply show the fields once populated, without the Owner having to do
+  anything). This preserves the offline-first/optimistic-add principle — a network-
+  dependent LLM call must never block or characterize the user-facing add path.
+- [x] **Gemini is a new external dependency** — the first LLM API integration in this
+  codebase. API key + selected model are **admin-configurable**, mirroring the existing
+  Google OAuth settings pattern (`Admin/GoogleSettingsPage.php` + `Support/Config.php`'s
+  `get_option('si_google_client_id', ...)` shape) — a new `Admin/GeminiSettingsPage.php`
+  + `si_gemini_api_key`/`si_gemini_model` options. This is the **first paid/metered
+  external API** the project depends on, which touches D §5's "€0 additional infra in
+  Stage 1" framing — Gemini calls are a new, real, usage-based cost. Record here as a
+  deliberate, owner-approved exception, not an oversight; no budget/quota/cost-cap
+  mechanism is specified in this resolution — flag as a future hardening item if costs
+  need bounding (D §14).
+- [x] **Future intent, not built now: merging two differently-worded StoreProduct rows
+  once their Gemini-extracted structured fields match** (e.g. two rows with different
+  `source_name` text but identical `brand_normalized` + the same parsed quantity). This
+  is recorded as a stated direction, same status as the `is_global_default` promotion
+  mechanism above — a plain intent for a future slice, no schema, job, or threshold
+  designed yet.
+
+### Resolved — unlimited-depth categories, many-to-many product↔category, and seeded default products (2026-06-19)
+
+The owner wants three things: (1) category buckets to support unlimited nesting
+depth, not the current flat ~20-30 list; (2) a UserProduct/StoreProduct to
+attach to more than one category at once; (3) every new account to start with
+~300 seeded generic products (from `shopping_intellect_mvp_starter_catalog_v1
+2.md`) instead of an empty system, with those seeded rows visible to and usable
+by every user but never deletable by an ordinary user. Closed as follows:
+
+- [x] **`categories` gains a nullable self-referencing `parent_id`** (FK →
+  `categories.id`, `ON DELETE SET NULL` so deleting a parent demotes children
+  to root rather than cascading). **No depth limit is enforced in code or
+  schema** — depth is just how many `parent_id` hops a query follows. This
+  **retires** the `04 §4.4` line "No `parent_id` in MVP — buckets are flat" —
+  flat is now simply the depth-1 case (`parent_id IS NULL`), not a hard rule.
+  Reading a bucket's full ancestor/descendant chain is a recursive query
+  (`WITH RECURSIVE` where the MySQL version supports it, §14 "exact MySQL
+  version" is still an open question this depends on — flag if the host's
+  version doesn't support CTEs and a closure-table/path-enumeration fallback
+  is needed instead).
+- [x] **`category_id` is removed from both `user_products` and
+  `store_products`; a new junction table `oCk_si_product_categories`**
+  replaces the one-to-one FK with many-to-many: `id`, exactly one of
+  `user_product_id`/`store_product_id` set (same app-level exactly-one-of
+  pattern as `list_items`, 2026-06-18), `category_id`, `created_at`. A
+  product/item can belong to any number of categories at once (e.g. a
+  product could sit under both "Зеленчуци" and a future "Био" tag-like
+  category) — this is the first real use of "many" so the junction table
+  is plain, no ordering/primary-category flag added speculatively.
+- [x] **`user_products.owner_type` gains a third enum value, `'system'`**
+  (alongside the existing `'user'`/`'family'`) — `ENUM('user','family','system')`.
+  A `system`-owned `UserProduct` has `owner_id = 0` (a reserved constant, not a
+  real `wp_users.ID` or `families.id`) and a new `is_global_default` flag.
+  **Only `user_products` gains this — `lists`/`purchase_log`'s `owner_type`
+  stay `ENUM('user','family')` unchanged**, since a list or a purchase event
+  is never system-owned.
+- [x] **Seeded rows are visible to every user (read) but not editable/
+  archivable by an ordinary user** — enforced in `UserProductService`/
+  `ListService` (an attempt to archive/edit a `system`-owned row is rejected,
+  same shape as the existing ownership check that already rejects editing
+  someone else's `user`/`family`-owned row), not by a DB constraint. Adding a
+  seeded product to a list or favoriting it are unaffected — those create
+  normal owner-scoped records/flags as today; only the seeded row itself is
+  protected.
+- [x] **The seed is a one-time data migration** importing the ~300 rows from
+  `shopping_intellect_mvp_starter_catalog_v1 2.md` as `system`-owned
+  `user_products` (`term` = the Bulgarian "Product" column, `normalized_term`
+  via the existing normalizer, `is_global_default = 1`), each linked via the
+  new junction table to a `categories` row matching the file's "Category"
+  column (the file's 25 categories map onto/extend the existing ~20-30 seeded
+  buckets — reconcile by name at migration-authoring time, don't duplicate a
+  bucket that already exists under a different slug). The file's "Default
+  unit"/"Quantity suggestions"/aliases columns are **not** modelled now — out
+  of scope for this resolution; flag as a future enrichment if quick-add
+  chips or alias-matching are built later (D §14).
+- [x] **Promoting a popular user-created term to global-default status is a
+  deliberately future, unbuilt mechanism** — the owner's stated direction
+  ("ako 100 users create Айвар, it also becomes default and visible to all")
+  is recorded here as intent, not built in this resolution. `is_global_default`
+  is a plain flag an admin process can flip later; no popularity-counting
+  job, threshold, or promotion endpoint exists yet.
 
 ### Resolved — Catalog becomes "browse my products" (amends the 2026-06-17 bottom-nav rule) (2026-06-18)
 

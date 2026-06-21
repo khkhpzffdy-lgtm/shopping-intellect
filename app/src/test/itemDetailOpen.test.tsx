@@ -106,6 +106,61 @@ describe('opening an item detail screen when the local UserProduct cache missed 
   });
 });
 
+describe('opening a store-product detail screen when the local cache missed it', () => {
+  beforeEach(async () => {
+    await putListItem({
+      client_uuid: 'item-sp-1',
+      id: '901',
+      list_client_uuid: 'list-1',
+      list_id: '42',
+      store_product_client_uuid: 'sp-orphan',
+      store_product_id: '77',
+      quantity: 1,
+      unit: 'бр.',
+      is_checked: false,
+      created_at: '2026-06-21T09:00:00.000Z',
+      updated_at: '2026-06-21T09:00:00.000Z'
+    });
+  });
+
+  test('falls back to GET /store-products/{id} and still opens, instead of the tile silently doing nothing', async () => {
+    mockedApiRequest.mockResolvedValue({
+      store_product: {
+        id: '77',
+        client_uuid: 'sp-orphan',
+        source: 'user',
+        created_by_user_id: '7',
+        name: 'Мляко Данон 2% 1л',
+        image_url: null,
+        barcode: null,
+        created_at: '2026-06-21T09:00:00.000Z'
+      }
+    });
+
+    render(<HomeScreen />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Отвори Тест' }));
+    const trigger = await screen.findByTestId('item-detail-trigger-item-sp-1');
+    await userEvent.click(trigger);
+
+    expect(await screen.findByTestId('store-product-detail')).toBeInTheDocument();
+    expect(screen.getByLabelText('Име')).toHaveValue('Мляко Данон 2% 1л');
+  });
+
+  test('shows an inline error instead of silently doing nothing when the server has no match either', async () => {
+    mockedApiRequest.mockRejectedValue(new Error('not found'));
+
+    render(<HomeScreen />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Отвори Тест' }));
+    const trigger = await screen.findByTestId('item-detail-trigger-item-sp-1');
+    await userEvent.click(trigger);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Този артикул не може да се отвори в момента.');
+    expect(screen.queryByTestId('store-product-detail')).not.toBeInTheDocument();
+  });
+});
+
 describe('list row unit display', () => {
   test('shows бр. instead of the internal English default "piece"', async () => {
     mockedApiRequest.mockResolvedValue({ user_products: [] });

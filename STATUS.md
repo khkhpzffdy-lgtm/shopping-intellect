@@ -133,7 +133,8 @@ just the **checklist of closed Slices** so nobody re-derives it from git log.
 | §4.0c-fix | "Добави конкретен артикул" button no longer hidden on term match | ✅ done |
 | §4.0e | Unlimited-depth categories, many-to-many product↔category, seeded ~300 default products | ✅ done — **migration not yet run on prod, see note below** |
 | §4.0f | StoreProduct dedupe across users + async Gemini metadata extraction | ✅ done — **migration not yet run on prod, see note below** |
-| §2.8a | UserProduct detail screen (rename + favorite + qty/unit edits), replaces the "Expand details soon" placeholder for UserProduct-backed list rows | ✅ done — **§2.8b (StoreProduct detail) still open, see note below** |
+| §2.8a | UserProduct detail screen (rename + favorite + qty/unit edits), replaces the "Expand details soon" placeholder for UserProduct-backed list rows | ✅ done |
+| §2.8b | StoreProduct detail screen (rename + photo + barcode), replaces the inert `<div>` for StoreProduct-backed list rows | ✅ done — see note below |
 
 **App (`app/`):** Vite + React PWA, FTP deploy wired. Implemented so far:
 - `AuthScreen` — register/login screen, working against the plugin's auth endpoints
@@ -402,8 +403,8 @@ plugin's `main` branch FTP-deploys.
 
 **Build order (2026-06-19, revised — added §4.0c-fix):** §3.1 (done) → §4.0 (done) → §2.3a (done) → §2.3b (done) → §2.3c (done)
 → §2.2d (done) → §2.3d (done) → §4.0b (done) → §2.6 (done) → §2.7 (done) → §4.0c (done) →
-§4.0c-fix (done) → §4.0e (done) → §4.0f (done) → §2.8a (done) →
-**§2.8b (next) → §4.0d → §2.9** →
+§4.0c-fix (done) → §4.0e (done) → §4.0f (done) → §2.8a (done) → §2.8b (done) →
+**§4.0d (next) → §2.9** →
 §3.2 → §3.3 → §4.1 → §4.2 → §4.3 → §2.4 (Family) → §2.5 (Favorites) → M5.
 **2026-06-18/19 re-sequencing:** the Owner asked for list management (delete/rename), item/
 product detail management, Catalog product management, and a Profile screen to be fully
@@ -1055,6 +1056,68 @@ row markup, no new CSS needed. New test in `catalogScreen.test.tsx` asserting a 
 renders indented under its parent. Confirms this is purely a display grouping fix —
 **no category data was changed or removed** (Owner explicitly chose to keep the old 20
 as real, legitimate narrower sub-categories, not delete/merge them).
+
+**§2.8b is done (2026-06-21).** StoreProduct detail screen — rename, photo, and
+barcode — replaces the inert, non-interactive `<div>` that a StoreProduct-backed
+("specific item") list row rendered as before this slice. Two open design questions
+were resolved with the Owner first and recorded in `decisions.md` before any code:
+**(1) who may edit a `source='user'` StoreProduct** — creator-only
+(`created_by_user_id`), not "anyone on a shared family list," because family-owned
+lists don't exist in the code yet (`ListService::createList()` rejects any
+`owner_type` other than `'user'`); a non-creator's edit attempt gets 403, mirroring
+the existing system-row 403 pattern. **(2) editing an existing barcode** is a true
+replace (delete-then-insert), not an accumulate, even though `oCk_si_barcodes`
+supports several values per product for a future multipack/variant UI. See
+`decisions.md` "Resolved — StoreProduct edit rights for `source='user'` rows" and
+"Resolved — barcode edit is a true replace, not an accumulate" (both 2026-06-21).
+**Backend (plugin repo, pushed to `main`):** new
+`Repositories/Contracts/BarcodeRepositoryInterface.php` (`attach()`/`replace()`/
+`valuesFor()`) + `Repositories/Wpdb/WpdbBarcodeRepository.php` against the
+previously-untouched `oCk_si_barcodes` table. `StoreProductRepositoryInterface`
+gained `update()` (mirrors `WpdbUserProductRepository::update()`, writes
+`source_name`/`normalized_name`/`image_url`/`is_archived`/`updated_at`).
+`StoreProductService` gained `rename()`/`setImageUrl()`/`setBarcode()` plus a shared
+`ownedUserSourcedStoreProduct()` guard (403 via new `StoreProductForbiddenException`
+on a `source='crawler'` row or a non-creator) — constructor gained one new optional
+trailing `?BarcodeRepositoryInterface $barcodes` param, so the existing
+`findOrCreate()`-only call sites/tests needed no changes. New
+`Api/StoreProductController.php`: `GET /store-products/{id}` (404 if missing,
+response includes a single `barcode` field) and `PATCH /store-products/{id}`
+(optional `name`/`image_url`/`barcode_value`, 400 if none given), wired into
+`RestApiBootstrap`/`Plugin.php` the same way `UserProductController` is. PHPUnit's
+`SqliteWpdb` test stub gained the `si_barcodes` table (it didn't exist there before).
+26 new backend tests (`WpdbBarcodeRepositoryTest`, `StoreProductServiceTest` rename/
+setImageUrl/setBarcode cases, new `StoreProductControllerTest`) — 184 total, was 167,
+all green. **Frontend (app repo, pushed to `main`):** new
+`StoreProductDetailScreen.tsx` (name/photo/barcode inputs, auto-commit on blur, same
+convention as `UserProductDetailScreen.tsx`; all three disabled for
+`source !== 'user'` with a "ръчно записан артикул..." note, and separately disabled
+with a distinct note when the logged-in user isn't the creator). `ListScreen.tsx`'s
+`item.user_product_client_uuid ? <button> : <div>` branch gained a second arm for
+`item.store_product_client_uuid`. `HomeScreen.tsx` gained
+`storeProductDetailKey`/`detailStoreProduct` state (mirrors
+`itemDetailKey`/`detailUserProduct`, the two overlays close each other so both can't
+be open at once) and `handleOpenStoreProductDetail`/`handleRenameStoreProduct`/
+`handleSetStoreProductImageUrl`/`handleSetStoreProductBarcode`. No "list all my store
+products" endpoint exists (unlike UserProduct's `/user-products`), so the
+cache-miss fallback in `handleOpenStoreProductDetail` is a direct
+`GET /store-products/{id}` instead of a list-and-filter. `sendMutation.ts`'s
+`resolveEndpoint()` gained a `/store-products/{id}` resolution branch (mirrors the
+existing `/user-products/{id}` one), so a barcode/rename mutation enqueued before a
+manually-created StoreProduct has synced still resolves to the real server id once
+it does. `AddSearchScreen.tsx`'s `manualBarcode` field — previously collected in
+state, typed into, and silently dropped (confirmed by reading
+`addManualStoreProduct()` before this fix) — now persists via the same PATCH flow
+once the item-add completes. `StoreProductRecord` (`storage/db.ts`) gained a
+`barcode?: string` field for local caching/display. New frontend tests: a
+`storeProductDetail.test.tsx` (8 tests, mirrors `userProductDetail.test.tsx`), two new
+cases in `itemDetailOpen.test.tsx` (server-fallback open + inline-error miss for
+StoreProduct), a regression test in `addSearch.test.tsx` proving the manual-barcode
+field now actually reaches the server, and two new `resolveEndpoint()` cases in
+`sendMutation.test.ts`. Full non-flaky suite (13 files, 74 tests) green, `tsc -b` +
+`vite build` clean. `App.test.tsx`/`flush.test.ts`'s pre-existing, unrelated timeout
+failures reconfirmed via `git stash` to predate this session, same standing issue
+noted in earlier `§2.8a` entries — still unfixed, still out of scope here.
 
 **2026-06-17 production incident — sync pipeline, four stacked bugs.** Every list/item was stuck
 `sync-pending` forever. Root-caused and fixed live (outside the normal Slice flow, by explicit

@@ -14,6 +14,7 @@ import {
   getLists,
   getMutationStatusCounts,
   getQueuedMutations,
+  getStoreProductByClientUuid,
   getUserProduct,
   getUserProductByTerm,
   markMutationInFlight,
@@ -21,17 +22,20 @@ import {
   mergeServerListItem,
   putList,
   putListItem,
+  putStoreProduct,
   putUserProduct,
   removeQueuedMutationsForEntity,
   touchListUpdatedAt,
   updateMutationBody,
   type ListItemView,
   type ShoppingListRecord,
+  type StoreProductRecord,
   type UserProductRecord
 } from '../storage/db';
 import { AddSearchScreen } from './AddSearchScreen';
 import { ListsScreen } from './ListsScreen';
 import { ListScreen } from './ListScreen';
+import { StoreProductDetailScreen } from './StoreProductDetailScreen';
 import { UserProductDetailScreen } from './UserProductDetailScreen';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { generateUuid } from '../utils/uuid';
@@ -73,6 +77,8 @@ export const HomeScreen = () => {
   const [addSearchOpen, setAddSearchOpen] = useState(false);
   const [itemDetailKey, setItemDetailKey] = useState<string | null>(null);
   const [detailUserProduct, setDetailUserProduct] = useState<UserProductRecord | null>(null);
+  const [storeProductDetailKey, setStoreProductDetailKey] = useState<string | null>(null);
+  const [detailStoreProduct, setDetailStoreProduct] = useState<StoreProductRecord | null>(null);
   const selectedListKeyRef = useRef<string | null>(null);
 
   selectedListKeyRef.current = selectedListKey;
@@ -85,6 +91,11 @@ export const HomeScreen = () => {
   const itemDetailItem = useMemo(
     () => items.find((candidate) => candidate.client_uuid === itemDetailKey) ?? null,
     [items, itemDetailKey]
+  );
+
+  const storeProductDetailItem = useMemo(
+    () => items.find((candidate) => candidate.client_uuid === storeProductDetailKey) ?? null,
+    [items, storeProductDetailKey]
   );
 
   const refreshMutationStatusCounts = async () => {
@@ -401,6 +412,8 @@ export const HomeScreen = () => {
       return;
     }
 
+    setStoreProductDetailKey(null);
+    setDetailStoreProduct(null);
     setErrorMessage(null);
     let userProduct = await getUserProduct(item.user_product_client_uuid);
 
@@ -439,6 +452,179 @@ export const HomeScreen = () => {
   const handleCloseItemDetail = () => {
     setItemDetailKey(null);
     setDetailUserProduct(null);
+  };
+
+  const handleOpenStoreProductDetail = async (item: ListItemView) => {
+    if (!item.store_product_client_uuid) {
+      return;
+    }
+
+    setItemDetailKey(null);
+    setDetailUserProduct(null);
+    setErrorMessage(null);
+    let storeProduct = await getStoreProductByClientUuid(item.store_product_client_uuid);
+
+    if (!storeProduct && item.store_product_id) {
+      // No equivalent "list all my store products" endpoint exists (unlike
+      // UserProduct's /user-products), so the fallback is a direct GET by id
+      // instead of a list-and-filter.
+      try {
+        const response = await apiRequest<{
+          store_product?: {
+            id?: string;
+            client_uuid?: string;
+            source?: 'crawler' | 'user';
+            created_by_user_id?: string | null;
+            name?: string;
+            image_url?: string | null;
+            barcode?: string | null;
+            created_at?: string;
+          };
+        }>(`/store-products/${item.store_product_id}`, { authenticated: true });
+
+        if (response.store_product) {
+          const fetched: StoreProductRecord = {
+            client_uuid: item.store_product_client_uuid,
+            id: response.store_product.id,
+            source: response.store_product.source ?? 'user',
+            created_by_user_id: response.store_product.created_by_user_id
+              ? Number(response.store_product.created_by_user_id)
+              : undefined,
+            name: response.store_product.name ?? item.term,
+            image_url: response.store_product.image_url ?? null,
+            barcode: response.store_product.barcode ?? undefined,
+            created_at: response.store_product.created_at ?? new Date().toISOString()
+          };
+          await putStoreProduct(fetched);
+          storeProduct = fetched;
+        }
+      } catch {
+        // Offline — nothing more we can do locally.
+      }
+    }
+
+    if (!storeProduct) {
+      setErrorMessage('Този артикул не може да се отвори в момента.');
+      return;
+    }
+
+    setStoreProductDetailKey(item.client_uuid);
+    setDetailStoreProduct(storeProduct);
+  };
+
+  const handleCloseStoreProductDetail = () => {
+    setStoreProductDetailKey(null);
+    setDetailStoreProduct(null);
+  };
+
+  const canEditStoreProduct = (storeProduct: StoreProductRecord) =>
+    storeProduct.created_by_user_id === undefined || storeProduct.created_by_user_id === user?.id;
+
+  const handleRenameStoreProduct = async (
+    storeProduct: StoreProductRecord,
+    newName: string
+  ): Promise<{ ok: boolean; error?: string }> => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === storeProduct.name) {
+      return { ok: true };
+    }
+
+    const previous = storeProduct;
+    const updated: StoreProductRecord = { ...storeProduct, name: trimmed };
+
+    await putStoreProduct(updated);
+    setDetailStoreProduct(updated);
+
+    const mutationUuid = generateUuid();
+    await enqueueMutation({
+      client_uuid: mutationUuid,
+      endpoint: `/store-products/${storeProduct.id ?? storeProduct.client_uuid}`,
+      method: 'PATCH',
+      body: { name: trimmed },
+      created_at: new Date().toISOString(),
+      attempts: 0,
+      status: 'pending',
+      entity_client_uuid: storeProduct.client_uuid
+    });
+
+    try {
+      const claimedMutation = await markMutationInFlight(mutationUuid);
+      if (claimedMutation) {
+        await sendMutation(claimedMutation);
+      }
+      return { ok: true };
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 403) {
+        // A real rejection, not a connectivity problem — revert the
+        // optimistic rename and drop the mutation so it doesn't keep
+        // retrying a request the server will never accept.
+        await putStoreProduct(previous);
+        setDetailStoreProduct(previous);
+        await removeQueuedMutationsForEntity(storeProduct.client_uuid);
+        return { ok: false, error: 'Този артикул не може да се преименува.' };
+      }
+      // Offline / network failure — keep the optimistic rename and the queued mutation.
+      return { ok: true };
+    }
+  };
+
+  const handleSetStoreProductImageUrl = async (storeProduct: StoreProductRecord, imageUrl: string | null) => {
+    const updated: StoreProductRecord = { ...storeProduct, image_url: imageUrl };
+    await putStoreProduct(updated);
+    setDetailStoreProduct(updated);
+
+    const mutationUuid = generateUuid();
+    await enqueueMutation({
+      client_uuid: mutationUuid,
+      endpoint: `/store-products/${storeProduct.id ?? storeProduct.client_uuid}`,
+      method: 'PATCH',
+      body: { image_url: imageUrl ?? '' },
+      created_at: new Date().toISOString(),
+      attempts: 0,
+      status: 'pending',
+      entity_client_uuid: storeProduct.client_uuid
+    });
+
+    try {
+      const claimedMutation = await markMutationInFlight(mutationUuid);
+      if (claimedMutation) {
+        await sendMutation(claimedMutation);
+      }
+    } catch {
+      // Keep local optimistic state and the pending mutation.
+    }
+  };
+
+  const handleSetStoreProductBarcode = async (storeProduct: StoreProductRecord, barcodeValue: string) => {
+    const trimmed = barcodeValue.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    const updated: StoreProductRecord = { ...storeProduct, barcode: trimmed };
+    await putStoreProduct(updated);
+    setDetailStoreProduct(updated);
+
+    const mutationUuid = generateUuid();
+    await enqueueMutation({
+      client_uuid: mutationUuid,
+      endpoint: `/store-products/${storeProduct.id ?? storeProduct.client_uuid}`,
+      method: 'PATCH',
+      body: { barcode_value: trimmed },
+      created_at: new Date().toISOString(),
+      attempts: 0,
+      status: 'pending',
+      entity_client_uuid: storeProduct.client_uuid
+    });
+
+    try {
+      const claimedMutation = await markMutationInFlight(mutationUuid);
+      if (claimedMutation) {
+        await sendMutation(claimedMutation);
+      }
+    } catch {
+      // Keep local optimistic state and the pending mutation.
+    }
   };
 
   // A new term added inline at list-write time has no `user_products` create
@@ -718,6 +904,7 @@ export const HomeScreen = () => {
             onAddItem={handleAddItem}
             onOpenAddSearch={() => setAddSearchOpen(true)}
             onOpenItemDetail={handleOpenItemDetail}
+            onOpenStoreProductDetail={handleOpenStoreProductDetail}
             onToggleChecked={handleToggleChecked}
             onRemoveItem={handleRemoveItem}
             onRenameList={(name) => handleRenameList(selectedList.client_uuid, name)}
@@ -806,6 +993,41 @@ export const HomeScreen = () => {
               onSetFavorite={(isFavorite) => handleSetFavorite(detailUserProduct, isFavorite)}
               onSetCategories={(categoryIds) => handleSetCategories(detailUserProduct, categoryIds)}
               onUpdateItem={(patch) => handleUpdateItem(itemDetailItem, patch)}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {selectedList && storeProductDetailItem && detailStoreProduct ? (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'var(--bg)',
+            zIndex: 50,
+            overflowY: 'auto'
+          }}
+          className="px-4 py-6 md:px-8"
+        >
+          <div className="mx-auto max-w-3xl space-y-4">
+            <div className="appbar">
+              <button
+                type="button"
+                onClick={handleCloseStoreProductDetail}
+                className="iconbtn"
+                aria-label="Затвори"
+              >
+                ←
+              </button>
+              <div className="appbar__title">Продукт</div>
+            </div>
+            <StoreProductDetailScreen
+              item={storeProductDetailItem}
+              storeProduct={detailStoreProduct}
+              canEdit={canEditStoreProduct(detailStoreProduct)}
+              onRename={(newName) => handleRenameStoreProduct(detailStoreProduct, newName)}
+              onSetImageUrl={(imageUrl) => handleSetStoreProductImageUrl(detailStoreProduct, imageUrl)}
+              onSetBarcode={(barcodeValue) => handleSetStoreProductBarcode(detailStoreProduct, barcodeValue)}
             />
           </div>
         </div>

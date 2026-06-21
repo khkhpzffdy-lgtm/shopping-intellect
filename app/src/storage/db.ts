@@ -31,6 +31,7 @@ export type StoreProductRecord = {
   created_by_user_id?: number;
   name: string;
   image_url?: string | null;
+  barcode?: string;
   created_at: string;
 };
 

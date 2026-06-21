@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/auth';
 import {
   enqueueMutation,
   getAllUserProducts,
+  getStoreProductByClientUuid,
   getUserProductByTerm,
   markMutationInFlight,
   putListItem,
@@ -253,6 +254,7 @@ export const AddSearchScreen = ({ selectedList, onItemAdded, isActive = true }: 
       image_url: manualPhotoUrl.trim() || null,
       created_at: now
     };
+    const barcode = manualBarcode.trim();
 
     await putStoreProduct(storeProduct);
     setShowManualForm(false);
@@ -261,6 +263,42 @@ export const AddSearchScreen = ({ selectedList, onItemAdded, isActive = true }: 
     setManualBarcode('');
     setQuery('');
     await addItemViaStoreProduct(storeProduct);
+
+    if (barcode) {
+      await setStoreProductBarcode(storeProduct, barcode);
+    }
+  };
+
+  // The item-add above may have already synced (online) and written the real
+  // server id back via applyMutationSuccess(), or may still be queued
+  // (offline) — `id ?? client_uuid` lets resolveEndpoint() in sendMutation.ts
+  // fill in the real id later either way, same pattern as
+  // HomeScreen's handleRenameUserProduct/handleSetFavorite.
+  const setStoreProductBarcode = async (storeProduct: StoreProductRecord, barcodeValue: string) => {
+    const current = (await getStoreProductByClientUuid(storeProduct.client_uuid)) ?? storeProduct;
+    const updated: StoreProductRecord = { ...current, barcode: barcodeValue };
+    await putStoreProduct(updated);
+
+    const mutationUuid = generateUuid();
+    await enqueueMutation({
+      client_uuid: mutationUuid,
+      endpoint: `/store-products/${current.id ?? current.client_uuid}`,
+      method: 'PATCH',
+      body: { barcode_value: barcodeValue },
+      created_at: new Date().toISOString(),
+      attempts: 0,
+      status: 'pending',
+      entity_client_uuid: storeProduct.client_uuid
+    });
+
+    try {
+      const claimedMutation = await markMutationInFlight(mutationUuid);
+      if (claimedMutation) {
+        await sendMutation(claimedMutation);
+      }
+    } catch {
+      // queued — will sync on next drain
+    }
   };
 
   const hasQuery = query.trim() !== '';

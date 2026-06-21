@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { clearDatabase, enqueueMutation, getMutation, putList } from '../storage/db';
+import { clearDatabase, enqueueMutation, getMutation, putList, putStoreProduct } from '../storage/db';
 import { flushQueuedMutations } from '../sync/flush';
 import { resolveEndpoint, sendMutation } from '../sync/sendMutation';
 
@@ -153,5 +153,43 @@ describe('resolveEndpoint resolves a queued list-delete mutation to the real ser
     });
 
     expect(endpoint).toBe('/lists/101');
+  });
+
+  test('resolves a queued PATCH store-product mutation to the real server id once synced', async () => {
+    await putStoreProduct({
+      client_uuid: 'sp-g',
+      id: '55',
+      source: 'user',
+      name: 'G',
+      created_at: '2026-06-21T10:00:00.000Z'
+    });
+
+    const endpoint = await resolveEndpoint({
+      client_uuid: 'mut-barcode-sp-g',
+      endpoint: '/store-products/sp-g',
+      method: 'PATCH',
+      body: { barcode_value: '123' },
+      created_at: '2026-06-21T10:00:00.000Z',
+      attempts: 0,
+      status: 'pending',
+      entity_client_uuid: 'sp-g'
+    });
+
+    expect(endpoint).toBe('/store-products/55');
+  });
+
+  test('falls back to the literal store-product endpoint if no server id is known yet', async () => {
+    const endpoint = await resolveEndpoint({
+      client_uuid: 'mut-barcode-sp-h',
+      endpoint: '/store-products/sp-h',
+      method: 'PATCH',
+      body: { barcode_value: '123' },
+      created_at: '2026-06-21T10:01:00.000Z',
+      attempts: 0,
+      status: 'pending',
+      entity_client_uuid: 'sp-h'
+    });
+
+    expect(endpoint).toBe('/store-products/sp-h');
   });
 });

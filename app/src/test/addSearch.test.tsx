@@ -247,6 +247,39 @@ describe('AddSearchScreen — search', () => {
     expect(body?.store_product?.client_uuid).toBeTruthy();
   });
 
+  test('submitting the manual form with a barcode persists it via PATCH /store-products/{id}', async () => {
+    // Regression guard: manualBarcode used to be collected in state and typed
+    // into, but addManualStoreProduct() built the StoreProduct object without
+    // ever sending it anywhere — confirmed by reading the code before this
+    // fix. This proves it now actually reaches the server.
+    mockedApiRequest
+      .mockResolvedValueOnce({ user_products: [] })
+      .mockResolvedValueOnce({ item: { id: '103' }, store_product: { id: '78' } })
+      .mockResolvedValueOnce({ store_product: { id: '78', barcode: '1234567890123' } });
+
+    const onItemAdded = vi.fn();
+    render(<AddSearchScreen selectedList={mockList} onItemAdded={onItemAdded} />);
+
+    const input = await screen.findByLabelText('Търси термин');
+    await userEvent.type(input, 'мляко данон 2% баркод');
+
+    await userEvent.click(await screen.findByTestId('add-specific-item'));
+    await userEvent.type(screen.getByLabelText('Баркод'), '1234567890123');
+    await userEvent.click(screen.getByTestId('manual-store-product-submit'));
+
+    await waitFor(() => expect(onItemAdded).toHaveBeenCalled());
+
+    await waitFor(() => {
+      const patchCall = mockedApiRequest.mock.calls.find(
+        (call) => (call[1] as { method?: string })?.method === 'PATCH'
+      );
+      expect(patchCall).toBeDefined();
+      expect(patchCall![0]).toBe('/store-products/78');
+      const body = (patchCall![1] as { body?: { barcode_value?: string } })?.body;
+      expect(body?.barcode_value).toBe('1234567890123');
+    });
+  });
+
   test('submitting the manual form with a blank name does nothing', async () => {
     mockedApiRequest.mockResolvedValueOnce({ user_products: [] });
 

@@ -1,5 +1,12 @@
 import { apiRequest } from '../api/client';
-import { getList, getUserProduct, markMutationDone, markMutationFailed, type MutationQueueRecord } from '../storage/db';
+import {
+  getList,
+  getStoreProductByClientUuid,
+  getUserProduct,
+  markMutationDone,
+  markMutationFailed,
+  type MutationQueueRecord
+} from '../storage/db';
 import { applyMutationSuccess } from './applyMutationSuccess';
 
 export const resolveEndpoint = async (mutation: MutationQueueRecord) => {
@@ -28,6 +35,12 @@ export const resolveEndpoint = async (mutation: MutationQueueRecord) => {
     if (userProductMatch) {
       const userProduct = await getUserProduct(userProductMatch[1]);
       return userProduct?.id ? `/user-products/${userProduct.id}` : mutation.endpoint;
+    }
+
+    const storeProductMatch = mutation.endpoint.match(/^\/store-products\/([^/]+)$/);
+    if (storeProductMatch) {
+      const storeProduct = await getStoreProductByClientUuid(storeProductMatch[1]);
+      return storeProduct?.id ? `/store-products/${storeProduct.id}` : mutation.endpoint;
     }
   }
 
